@@ -1,6 +1,6 @@
-import createApp from "@/server/app";
 import { BOT_TOKEN, PUBLIC_URL, PORT } from "@/config/env";
 import { bot } from "@/bot";
+import { app } from "@/server/app";
 
 const ensureWebhook = async (webhookUrl: string) => {
   try {
@@ -30,8 +30,8 @@ const ensureWebhook = async (webhookUrl: string) => {
 
 (async function main() {
   const port = PORT || 3001;
-  const app = createApp();
-  app.listen(port, async () => {
+  const telegramApp = app;
+  telegramApp.listen(port, async () => {
     if (!PUBLIC_URL) {
       console.error(
         "[webhook-error] PUBLIC_URL is missing; cannot set webhook. Set URL env var."
@@ -41,6 +41,5 @@ const ensureWebhook = async (webhookUrl: string) => {
 
     const webhookUrl = `${PUBLIC_URL}/bot${BOT_TOKEN}`;
     await ensureWebhook(webhookUrl);
-    console.log(`bot is listening on port ${port}`);
   });
 })();

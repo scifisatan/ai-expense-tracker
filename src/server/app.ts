@@ -3,7 +3,7 @@ import type { Update } from "node-telegram-bot-api";
 import { bot } from "@/bot";
 import { BOT_TOKEN, PUBLIC_URL, PORT } from "@/config/env";
 
-const app = new Elysia();
+export const app = new Elysia();
 
 const webhookPath = `/bot${BOT_TOKEN}`;
 
@@ -20,5 +20,3 @@ app.listen(PORT, async () => {
   }
   console.log(`Bot is listening on port ${PORT}`);
 });
-
-export default app;
