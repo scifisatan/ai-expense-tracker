@@ -1,9 +1,9 @@
-import TelegramBot from "node-telegram-bot-api";
-import createAIService from "@/services/ai";
-import { log } from "@/config/logger";
-import { computeTotals } from "@/bot/transactions";
-import { createBalanceService } from "@/bot/balance";
-import { createTelegramService } from "@/services/telegram";
+import TelegramBot from 'node-telegram-bot-api';
+import createAIService from '../services/ai';
+import { log } from '../config/logger';
+import { computeTotals } from './transactions';
+import { createBalanceService } from './balance';
+import { createTelegramService } from '../services/telegram';
 
 export const registerHandlers = (bot: TelegramBot) => {
   const ai = createAIService();
@@ -15,11 +15,11 @@ export const registerHandlers = (bot: TelegramBot) => {
     try {
       await balanceService.sendAndPinBalance(chatId, 0);
     } catch (e) {
-      console.error("[start-balance-error]", e);
+      console.error('[start-balance-error]', e);
     }
   });
 
-  bot.on("message", async (msg) => {
+  bot.on('message', async (msg) => {
     const chatId = msg.chat.id;
 
     // Remove Telegram's "pinned message" service notifications to keep chat clean.
@@ -35,25 +35,24 @@ export const registerHandlers = (bot: TelegramBot) => {
     if (msg.from?.is_bot) return; // avoid pinning bot/system messages
 
     // Prefer text; fall back to caption for media messages.
-    const text = (msg.text ?? msg.caption ?? "").trim();
+    const text = (msg.text ?? msg.caption ?? '').trim();
     if (!text) return;
 
     try {
       const start = Date.now();
-      log.debug("[extract-input]", text);
+      log.debug('[extract-input]', text);
       const extracted = await ai.extractTransactions(text);
       const duration = Date.now() - start;
-      log.debug("[extract-output]", extracted, `(${duration}ms)`);
+      log.debug('[extract-output]', extracted, `(${duration}ms)`);
 
       if (!extracted.items.length) return;
 
       const { net } = computeTotals(extracted.items);
 
-      const { balance: currentBalance } = await balanceService.getPinnedBalance(
-        chatId
-      );
+      const { balance: currentBalance } =
+        await balanceService.getPinnedBalance(chatId);
       if (currentBalance === null) {
-        log.debug("[balance-skip] no pinned balance; ignoring message");
+        log.debug('[balance-skip] no pinned balance; ignoring message');
         return;
       }
 
@@ -65,20 +64,20 @@ export const registerHandlers = (bot: TelegramBot) => {
           newBalance
         );
         log.info(
-          "[balance] prev=",
+          '[balance] prev=',
           currentBalance,
-          "new=",
+          'new=',
           newBalance,
-          "net=",
+          'net=',
           net,
-          "pinnedMessageId=",
+          'pinnedMessageId=',
           pinnedMessageId
         );
       } catch (e) {
-        console.error("[balance-pin-error]", e);
+        console.error('[balance-pin-error]', e);
       }
     } catch (err) {
-      log.error("[extract-error]", err);
+      log.error('[extract-error]', err);
       return;
     }
   });

@@ -1,7 +1,7 @@
-import { createTelegramService } from "@/services/telegram";
-import type TelegramBot from "node-telegram-bot-api";
-import { parseBalance } from "@/utils/parser";
-import type { BalanceInfo } from "@/bot/types";
+import { createTelegramService } from '../services/telegram';
+import type TelegramBot from 'node-telegram-bot-api';
+import { parseBalance } from '../utils/parser';
+import type { BalanceInfo } from './types';
 
 export const createBalanceService = (bot: TelegramBot) => {
   const ts = createTelegramService(bot);
@@ -20,7 +20,7 @@ export const createBalanceService = (bot: TelegramBot) => {
           }
         }
       } catch (e) {
-        console.error("[balance-fetch-error]", e);
+        console.error('[balance-fetch-error]', e);
       }
       return { balance: null };
     },

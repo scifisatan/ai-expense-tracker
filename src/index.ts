@@ -1,7 +1,7 @@
 import { Elysia } from 'elysia';
 import type { Update } from 'node-telegram-bot-api';
-import { bot } from '@/bot';
-import { BOT_TOKEN, PUBLIC_URL, PORT } from '@/config/env';
+import { bot } from './bot';
+import { BOT_TOKEN, PUBLIC_URL, PORT } from './config/env';
 
 const app = new Elysia();
 

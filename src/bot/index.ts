@@ -1,6 +1,6 @@
-import TelegramBot from "node-telegram-bot-api";
-import { BOT_TOKEN } from "@/config/env";
-import { registerHandlers } from "@/bot/handlers";
+import TelegramBot from 'node-telegram-bot-api';
+import { BOT_TOKEN } from '../config/env';
+import { registerHandlers } from './handlers';
 
 export const createBot = (
   token: string,

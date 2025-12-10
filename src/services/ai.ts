@@ -1,8 +1,8 @@
 import { createGroq } from '@ai-sdk/groq';
 import { generateObject } from 'ai';
 import { z } from 'zod';
-import { GROQ_TOKEN } from '@/config/env';
-import { log } from '@/config/logger';
+import { GROQ_TOKEN } from '../config/env';
+import { log } from '../config/logger';
 
 const groq = createGroq({
   apiKey: GROQ_TOKEN,
