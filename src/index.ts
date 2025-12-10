@@ -16,6 +16,8 @@ app.post(webhookPath, ({ body }) => {
 
 app.listen(PORT, async () => {
   console.log('Public URL', PUBLIC_URL);
+  console.log('token', BOT_TOKEN);
+  console.log('Webhook Path', webhookPath);
   await bot.setWebHook(`${PUBLIC_URL}${webhookPath}`);
   console.log('Webhook has been set');
   console.log(`Bot is listening on port ${PORT}`);
