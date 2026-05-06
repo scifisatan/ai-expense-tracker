@@ -216,21 +216,44 @@ app.post('/api/auth/request-otp', async (c) => {
 
 app.post('/api/auth/verify-otp', async (c) => {
   const body = (await c.req.json().catch(() => null)) as {
+    username?: string;
     chatId?: number;
     otp?: string;
     challengeToken?: string;
   } | null;
 
-  const chatId = Number(body?.chatId);
+  let chatId = Number(body?.chatId);
+  const username = body?.username?.replace(/^@/, '').trim();
   const otp = String(body?.otp ?? '').trim();
   const challengeToken = body?.challengeToken ?? '';
+
+  // Resolve chatId from username if not provided
+  if (!Number.isFinite(chatId) && username) {
+    const user = await c.env.DB
+      .prepare('SELECT user_id FROM users WHERE LOWER(username) = LOWER(?)')
+      .bind(username)
+      .first<{ user_id: number }>();
+
+    if (!user) {
+      return c.json(
+        { error: 'Username not found. Please send /start to the bot first.' },
+        404
+      );
+    }
+
+    chatId = user.user_id;
+  }
 
   if (!Number.isFinite(chatId) || otp.length !== 6 || !challengeToken) {
     return c.json({ error: 'Invalid OTP verification payload.' }, 400);
   }
 
   const manager = getSessionManager(c.env);
-  const isValid = await manager.verifyOtpChallenge(challengeToken, chatId, otp);
+  const isValid = await manager.verifyOtpChallenge(
+    challengeToken,
+    chatId,
+    otp
+  );
 
   if (!isValid) {
     return c.json({ error: 'Invalid or expired OTP.' }, 400);
@@ -393,7 +416,7 @@ app.get('/app', (c) => {
         <title>Budget Bot</title>
         <ViteClient />
         <Script src='/src/web/client.tsx' />
-         <Link href='/src/web/styles.css' rel='stylesheet' />
+        <Link href='/src/web/styles.css' rel='stylesheet' />
       </head>
       <body>
         <div id='root' />
