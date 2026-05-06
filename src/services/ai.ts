@@ -1,7 +1,8 @@
 import { createGroq } from '@ai-sdk/groq';
-import { generateObject } from 'ai';
+import { generateText } from 'ai';
 import { z } from 'zod';
-import { GROQ_TOKEN } from '../config/env';
+import { AI_MODEL, GROQ_TOKEN } from '../config/env';
+import type { ModelConfigService } from './model-config';
 import { log } from '../config/logger';
 
 const groq = createGroq({
@@ -22,38 +23,58 @@ const transactionsSchema = z.object({
 export type TransactionItem = z.infer<typeof transactionItemSchema>;
 export type TransactionsExtraction = z.infer<typeof transactionsSchema>;
 
-export const createAIService = (options?: { model?: string }) => {
-  const model: any = groq(options?.model ?? 'moonshotai/kimi-k2-instruct-0905');
-
+export const createAIService = (options?: {
+  model?: string;
+  modelConfig?: Pick<ModelConfigService, 'getCurrentModel'>;
+}) => {
   return {
     async extractTransactions(
       message: string
     ): Promise<TransactionsExtraction> {
+      const selectedModel =
+        options?.model ??
+        options?.modelConfig?.getCurrentModel() ??
+        AI_MODEL ??
+        'meta-llama/llama-4-scout-17b-16e-instruct';
+
+      const model: any = groq(selectedModel);
       if (!GROQ_TOKEN) {
         throw new Error('Missing GROQ_TOKEN in environment variables.');
       }
 
+      log.debug('ai.extractTransactions.model', selectedModel);
       log.debug('ai.extractTransactions.prompt', message);
 
-      // NOTE: cast `generateObject` to `any` to avoid TypeScript's deep type
-      // instantiation error caused by complex generic inference with the
-      // `ai` package and Zod schemas. We then cast the result to the
-      // concrete `TransactionsExtraction` type to preserve type safety.
-      const { object } = (await (generateObject as any)({
+      const { text } = await generateText({
         model,
-        schema: transactionsSchema,
         prompt: `Extract every monetary transaction mentioned in the message.
 
 Message: "${message}"
 
-Return an array of items. For each item:
-- amount: integer (no decimals, strip currency symbols)
-- type: "Expense" if money flows out / spending / paying; "Deposit" if money flows in / receiving.
+Return ONLY valid JSON with this exact shape:
+{"items":[{"amount":123,"type":"Expense"}]}
 
-If there are multiple amounts, include all of them. If no clear amounts, return items: [].`,
-      })) as unknown as { object: TransactionsExtraction };
+Rules:
+- amount must be an integer (no decimals, strip currency symbols).
+- type must be either "Expense" or "Deposit".
+- If no clear amounts are found, return: {"items":[]}
+- Do not include markdown, backticks, or extra text.`,
+      });
 
-      return object;
+      const cleaned = text
+        .trim()
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/, '');
+
+      try {
+        const parsed = JSON.parse(cleaned);
+        return transactionsSchema.parse(parsed);
+      } catch {
+        const match = cleaned.match(/\{[\s\S]*\}/);
+        if (!match) return { items: [] };
+        const parsed = JSON.parse(match[0]);
+        return transactionsSchema.parse(parsed);
+      }
     },
   };
 };

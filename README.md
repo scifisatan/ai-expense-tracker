@@ -7,6 +7,9 @@ A simple, maintainable Telegram-based budget tracker that extracts transactions 
 
 - Extract transactions (deposits/expenses) using an AI-based extractor
 - Maintain and pin a shared balance in group chats
+- List only Groq models that support structured output (`/models`)
+- Interactive model picker with inline buttons (pagination + refresh)
+- Change the active model at runtime (`/model <model-id>` or button tap)
 - Reusable services and modular code for future extensions
 
 ## Project Structure (opinionated)
@@ -43,9 +46,37 @@ TOKEN=<telegram_bot_token>
 URL=<public_https_url_for_webhook>
 PORT=3001
 GROQ_TOKEN=<groq_ai_key>
+AI_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
 ```
 
 `URL` is required when using webhook mode and deploying to a public server.
+
+## Model Commands
+
+- `/models` → opens interactive picker (only structured-output models)
+- `/model` → opens the same interactive picker
+- `/model <model-id>` → switches active model for new AI calls
+
+The picker includes inline buttons, pagination, and refresh.
+
+## Chat Keyboard
+
+The bot enables a persistent reply keyboard with quick actions:
+- `💰 Balance`
+- `🤖 Models`
+- `⚙️ Settings`
+- `ℹ️ Help`
+- `🙈 Hide Keyboard`
+
+You can also use:
+- `/settings` for interactive settings menu
+- `/hidekeyboard` to remove the keyboard
+- `/showkeyboard` to bring it back
+- `/menu` to re-open the inline menu + keyboard
+
+Settings currently support currency format and verbose/concise confirmations.
+
+Note: model changes and settings are in-memory and reset on app restart.
 
 ## Development
 
