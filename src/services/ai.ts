@@ -1,17 +1,12 @@
 import { createGroq } from '@ai-sdk/groq';
 import { generateText } from 'ai';
 import { z } from 'zod';
-import { AI_MODEL, GROQ_TOKEN } from '../config/env';
-import type { ModelConfigService } from './model-config';
 import { log } from '../config/logger';
-
-const groq = createGroq({
-  apiKey: GROQ_TOKEN,
-});
 
 const transactionItemSchema = z.object({
   amount: z.number().int().describe('Transaction amount as positive integer'),
-  type: z.enum(['Expense', 'Deposit']).describe('Money flow direction'),
+  type: z.enum(['Expense', 'Income']).describe('Money flow direction'),
+  note: z.string().describe('Note related to the transaction'),
 });
 
 const transactionsSchema = z.object({
@@ -23,40 +18,32 @@ const transactionsSchema = z.object({
 export type TransactionItem = z.infer<typeof transactionItemSchema>;
 export type TransactionsExtraction = z.infer<typeof transactionsSchema>;
 
-export const createAIService = (options?: {
-  model?: string;
-  modelConfig?: Pick<ModelConfigService, 'getCurrentModel'>;
-}) => {
+export const createAIService = (options: { model: string }) => {
   return {
     async extractTransactions(
-      message: string
+      message: string,
+      groqToken: string
     ): Promise<TransactionsExtraction> {
-      const selectedModel =
-        options?.model ??
-        options?.modelConfig?.getCurrentModel() ??
-        AI_MODEL ??
-        'meta-llama/llama-4-scout-17b-16e-instruct';
+      const groq = createGroq({ apiKey: groqToken });
 
-      const model: any = groq(selectedModel);
-      if (!GROQ_TOKEN) {
-        throw new Error('Missing GROQ_TOKEN in environment variables.');
-      }
-
-      log.debug('ai.extractTransactions.model', selectedModel);
+      log.debug('ai.extractTransactions.model', options.model);
       log.debug('ai.extractTransactions.prompt', message);
 
       const { text } = await generateText({
-        model,
+        model: groq(options.model) as any,
         prompt: `Extract every monetary transaction mentioned in the message.
 
 Message: "${message}"
 
 Return ONLY valid JSON with this exact shape:
-{"items":[{"amount":123,"type":"Expense"}]}
+{"items":[{"amount":123,"type":"Expense","note":"coffee"}]}
 
 Rules:
 - amount must be an integer (no decimals, strip currency symbols).
-- type must be either "Expense" or "Deposit".
+- type must be either "Expense" or "Income".
+- note must describe the specific transaction amount it appears next to or on the same line as.
+- Associate descriptive text with the closest relevant amount.
+- If no clear note is associated, use an empty string.
 - If no clear amounts are found, return: {"items":[]}
 - Do not include markdown, backticks, or extra text.`,
       });

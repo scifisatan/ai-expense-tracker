@@ -1,566 +1,341 @@
-import TelegramBot from 'node-telegram-bot-api';
-import createAIService from '../services/ai';
+import { InlineKeyboard } from 'grammy';
+import type { Bot } from 'grammy';
+import { createAIService } from '../services/ai';
 import { log } from '../config/logger';
-import { computeTotals } from './transactions';
-import { createBalanceService } from './balance';
-import { createTelegramService } from '../services/telegram';
-import { createModelConfigService } from '../services/model-config';
+import { createTransactionManager } from '../services/transaction-manager';
+import { createTransactionStore } from '../storage/transaction-store';
+import { createUserStore } from '../storage/user-store';
+import { createUserConfigStore } from '../storage/user-config';
+import type { BotContext } from './index';
 
-const MODELS_PAGE_SIZE = 6;
+import { TelegramLedgerAdapter } from '../services/ledger-display/telegram-adapter';
 
-type ChatPrefs = {
-  currency: 'rs' | 'inr';
-  verbose: boolean;
-  keyboardHidden: boolean;
-};
+const DEFAULT_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
-const chatPrefs = new Map<number, ChatPrefs>();
+const getMainMenu = () =>
+  new InlineKeyboard()
+    .text('💰 Show Balance', 'ui:balance')
+    .text('📒 Transactions', 'ui:transactions')
+    .row()
+    .text('ℹ️ Help', 'ui:help');
 
-const getPrefs = (chatId: number): ChatPrefs => {
-  const existing = chatPrefs.get(chatId);
-  if (existing) return existing;
-
-  const next: ChatPrefs = {
-    currency: 'rs',
-    verbose: true,
-    keyboardHidden: false,
-  };
-  chatPrefs.set(chatId, next);
-  return next;
-};
-
-const shorten = (text: string, max = 48) =>
-  text.length <= max ? text : `${text.slice(0, max - 1)}…`;
-
-const formatMoney = (chatId: number, value: number) => {
-  const { currency } = getPrefs(chatId);
-  return currency === 'inr' ? `₹${value}` : `Rs. ${value}`;
-};
-
-const getMainMenu = (): TelegramBot.InlineKeyboardMarkup => ({
-  inline_keyboard: [
-    [
-      { text: '💰 Show Balance', callback_data: 'ui:balance' },
-      { text: '🤖 AI Model', callback_data: 'ui:models' },
-    ],
-    [
-      { text: '⚙️ Settings', callback_data: 'ui:settings' },
-      { text: 'ℹ️ Help', callback_data: 'ui:help' },
-    ],
-  ],
-});
-
-const getChatKeyboard = (): TelegramBot.ReplyKeyboardMarkup => ({
-  keyboard: [
-    [{ text: '💰 Balance' }, { text: '🤖 Models' }],
-    [{ text: '⚙️ Settings' }, { text: 'ℹ️ Help' }],
-    [{ text: '🙈 Hide Keyboard' }, { text: '/start' }],
-  ],
+const getChatKeyboard = () => ({
+  keyboard: [[{ text: '💰 Balance' }, { text: '📒 Transactions' }], [{ text: 'ℹ️ Help' }], [{ text: '/start' }]],
   resize_keyboard: true,
   is_persistent: true,
 });
 
-const buildSettingsMenu = (
-  prefs: ChatPrefs
-): { text: string; replyMarkup: TelegramBot.InlineKeyboardMarkup } => {
-  const currencyLabel = prefs.currency === 'inr' ? '₹' : 'Rs.';
+const formatMoney = (value: number) => `Rs. ${value}`;
 
-  return {
-    text: [
-      '⚙️ Settings',
-      `• Currency: ${currencyLabel}`,
-      `• Verbose confirmations: ${prefs.verbose ? 'On' : 'Off'}`,
-      '',
-      'Use buttons to update preferences.',
-    ].join('\n'),
-    replyMarkup: {
-      inline_keyboard: [
-        [
-          {
-            text: prefs.verbose ? '🔕 Set concise responses' : '🗣️ Set detailed responses',
-            callback_data: 'settings:toggle-verbose',
-          },
-        ],
-        [
-          {
-            text: `${prefs.currency === 'rs' ? '✅ ' : ''}Rs. format`,
-            callback_data: 'settings:currency:rs',
-          },
-          {
-            text: `${prefs.currency === 'inr' ? '✅ ' : ''}₹ format`,
-            callback_data: 'settings:currency:inr',
-          },
-        ],
-        [
-          { text: '⌨️ Show Keyboard', callback_data: 'settings:show-keyboard' },
-          { text: '🙈 Hide Keyboard', callback_data: 'settings:hide-keyboard' },
-        ],
-        [{ text: '🏠 Back to menu', callback_data: 'ui:menu' }],
-      ],
-    },
-  };
-};
+const formatTimestamp = (value: string) => `${value} UTC`;
 
-const buildModelsMenu = (
-  models: string[],
-  currentModel: string,
-  page: number
-): { text: string; replyMarkup: TelegramBot.InlineKeyboardMarkup } => {
-  const totalPages = Math.max(1, Math.ceil(models.length / MODELS_PAGE_SIZE));
-  const safePage = Math.min(Math.max(page, 0), totalPages - 1);
-  const start = safePage * MODELS_PAGE_SIZE;
-  const pageModels = models.slice(start, start + MODELS_PAGE_SIZE);
+const getMissingKeyWarning = () =>
+  [
+    '⚠️ Your Groq API key is not set.',
+    'Please set it first:',
+    '`/setkey <your_groq_api_key>`',
+    '',
+    'Example:',
+    '`/setkey gsk_xxxxx`',
+  ].join('\n');
 
-  const inline_keyboard: TelegramBot.InlineKeyboardButton[][] = pageModels.map(
-    (id) => [
-      {
-        text: id === currentModel ? `✅ ${shorten(id)}` : shorten(id),
-        callback_data: `models:set:${id}`,
-      },
-    ]
-  );
-
-  const navRow: TelegramBot.InlineKeyboardButton[] = [];
-  if (safePage > 0) {
-    navRow.push({ text: '⬅️ Prev', callback_data: `models:page:${safePage - 1}` });
-  }
-  navRow.push({
-    text: `Page ${safePage + 1}/${totalPages}`,
-    callback_data: 'models:noop',
+export const registerHandlers = (bot: Bot<BotContext>) => {
+  const getServices = (ctx: BotContext) => ({
+    userStore: createUserStore(ctx.env.DB),
+    userConfigStore: createUserConfigStore(ctx.env.DB),
+    transactionManager: createTransactionManager({
+      db: ctx.env.DB,
+      aiModel: ctx.env.AI_MODEL ?? DEFAULT_MODEL,
+      display: new TelegramLedgerAdapter(ctx.env.BOT_TOKEN!),
+    }),
   });
-  if (safePage < totalPages - 1) {
-    navRow.push({ text: 'Next ➡️', callback_data: `models:page:${safePage + 1}` });
-  }
 
-  inline_keyboard.push(navRow);
-  inline_keyboard.push([
-    { text: '🔄 Refresh', callback_data: 'models:refresh' },
-    { text: '🏠 Menu', callback_data: 'ui:menu' },
-  ]);
+  const requireUserGroqKey = async (ctx: BotContext, userId: number) => {
+    const { userConfigStore } = getServices(ctx);
+    const key = await userConfigStore.getGroqApiKey(userId);
 
-  return {
-    text: [
-      'Structured-output models (Groq)',
-      `Current: ${currentModel}`,
-      '',
-      'Tap a model to switch.',
-    ].join('\n'),
-    replyMarkup: { inline_keyboard },
-  };
-};
+    if (!key) {
+      await ctx.reply(getMissingKeyWarning(), { parse_mode: 'Markdown' });
+      return null;
+    }
 
-export const registerHandlers = (bot: TelegramBot) => {
-  const modelConfig = createModelConfigService();
-  const ai = createAIService({ modelConfig });
-  const telegram = createTelegramService(bot);
-  const balanceService = createBalanceService(bot);
-
-  const maybeChatKeyboard = (
-    chatId: number
-  ): TelegramBot.ReplyKeyboardMarkup | undefined => {
-    return getPrefs(chatId).keyboardHidden ? undefined : getChatKeyboard();
+    return key;
   };
 
-  const hideKeyboard = async (chatId: number) => {
-    getPrefs(chatId).keyboardHidden = true;
-    await telegram.sendMessage(
-      chatId,
-      'Keyboard hidden. Use /menu or /showkeyboard to bring it back.',
-      { reply_markup: { remove_keyboard: true } }
-    );
-  };
-
-  const showKeyboard = async (chatId: number) => {
-    getPrefs(chatId).keyboardHidden = false;
-    await telegram.sendMessage(chatId, 'Keyboard shortcuts enabled ⌨️', {
-      reply_markup: getChatKeyboard(),
-    });
-  };
-
-  const sendHelp = async (chatId: number) => {
-    await telegram.sendMessage(
+  const sendHelp = async (ctx: BotContext, chatId: number) => {
+    await ctx.api.sendMessage(
       chatId,
       [
         '👋 *Budget Bot Help*',
         '',
         '• Send messages like `Paid 200`, `Got 500`, `Spent 120 and 80`',
         '• I extract transactions and update pinned balance automatically.',
+        '• I also keep a per-chat transaction history in D1.',
         '',
         '*Commands*',
         '`/start` Initialize and pin balance',
+        '`/app` Get your Chat ID and login OTP',
+        '`/setkey <key>` Save your Groq API key',
+        '`/removekey` Remove your saved Groq API key',
+        '`/keystatus` Check if your key is set',
         '`/balance` Show current balance',
-        '`/models` Choose AI model (structured output only)',
-        '`/settings` Configure behavior',
-        '`/hidekeyboard` or `/showkeyboard`',
+        '`/transactions` Show recent transactions',
+        '`/clear` Wipe all your transaction data',
+        '`/help` Show this help',
       ].join('\n'),
       {
         parse_mode: 'Markdown',
-        reply_markup: maybeChatKeyboard(chatId),
+        reply_markup: getChatKeyboard(),
       }
     );
   };
 
-  const sendBalance = async (chatId: number) => {
-    const { balance } = await balanceService.getPinnedBalance(chatId);
-    if (balance === null) {
-      await telegram.sendMessage(
-        chatId,
-        'I cannot find a pinned balance yet. Use /start to initialize it.',
-        { reply_markup: maybeChatKeyboard(chatId) }
-      );
+  const sendBalance = async (ctx: BotContext, chatId: number) => {
+    const { transactionManager } = getServices(ctx);
+    // This updates the pinned message and current balance state
+    await transactionManager.refreshPinnedBalance(chatId);
+  };
+
+  const sendRecentTransactions = async (ctx: BotContext, chatId: number) => {
+    const { transactionManager } = getServices(ctx);
+    const store = createTransactionStore(ctx.env.DB);
+    const transactions = await store.listRecent(chatId, 10);
+
+    if (!transactions.length) {
+      await ctx.api.sendMessage(chatId, '📭 No transactions recorded yet.', {
+        reply_markup: getChatKeyboard(),
+      });
       return;
     }
 
-    await telegram.sendMessage(chatId, `💰 Current Balance: ${formatMoney(chatId, balance)}`, {
-      reply_markup: maybeChatKeyboard(chatId),
+    const lines = transactions.map((tx, index) => {
+      const sign = tx.type === 'Expense' ? '-' : '+';
+      const note = tx.note ? ` • ${tx.note}` : '';
+      return `${index + 1}. ${sign}${formatMoney(tx.amount)}${note}`;
+    });
+
+    await ctx.api.sendMessage(chatId, `📒 *Recent Transactions*\n\n${lines.join('\n')}`, {
+      parse_mode: 'Markdown',
+      reply_markup: getChatKeyboard(),
     });
   };
 
-  const renderSettingsMenu = async (chatId: number, messageId?: number) => {
-    const { text, replyMarkup } = buildSettingsMenu(getPrefs(chatId));
+  bot.command('start', async (ctx) => {
+    const chatId = ctx.chat.id;
+    const user = ctx.from;
+    if (!user) return;
 
-    if (!messageId) {
-      await telegram.sendMessage(chatId, text, { reply_markup: replyMarkup });
-      return;
-    }
-
-    await telegram.editMessageText(text, {
-      chat_id: chatId,
-      message_id: messageId,
-      reply_markup: replyMarkup,
-    });
-  };
-
-  const renderModelsMenu = async (
-    chatId: number,
-    messageId?: number,
-    page = 0,
-    forceRefresh = false
-  ) => {
-    const models = await modelConfig.listStructuredOutputModels(forceRefresh);
-    const currentModel = modelConfig.getCurrentModel();
-    const { text, replyMarkup } = buildModelsMenu(models, currentModel, page);
-
-    if (!messageId) {
-      await telegram.sendMessage(chatId, text, { reply_markup: replyMarkup });
-      return;
-    }
-
-    await telegram.editMessageText(text, {
-      chat_id: chatId,
-      message_id: messageId,
-      reply_markup: replyMarkup,
-    });
-  };
-
-  bot.onText(/\/start/, async (msg) => {
-    const chatId = msg.chat.id;
     try {
-      getPrefs(chatId).keyboardHidden = false;
-      await balanceService.sendAndPinBalance(chatId, 0);
-      await telegram.sendMessage(
-        chatId,
-        '✅ Budget tracking is active. I pinned the initial balance at Rs. 0.',
-        { reply_markup: getChatKeyboard() }
+      const { transactionManager, userConfigStore, userStore } = getServices(ctx);
+      
+      await userStore.ensureUser({
+        id: user.id,
+        username: user.username,
+        first_name: user.first_name,
+        last_name: user.last_name
+      });
+
+      const currentBalance = await transactionManager.refreshPinnedBalance(chatId);
+      const existingKey = await userConfigStore.getGroqApiKey(user.id);
+
+      await ctx.reply(
+        `✅ Budget tracking is active. I pinned the current balance at Rs. ${currentBalance}.\n\n🌐 Web app: open the deployed domain, enter chat ID \`${chatId}\`, and use /app to get your OTP.`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: getChatKeyboard(),
+        }
       );
+
+      if (!existingKey) {
+        await ctx.reply(getMissingKeyWarning(), { parse_mode: 'Markdown' });
+      } else {
+        await ctx.reply('🔐 Groq API key is already set for your account.');
+      }
     } catch (e) {
       console.error('[start-balance-error]', e);
-      await telegram.sendMessage(chatId, 'Failed to initialize. Please try /start again.');
+      await ctx.reply('Failed to initialize. Please try /start again.');
     }
   });
 
-  bot.onText(/\/help(?:@[\w_]+)?$/, async (msg) => sendHelp(msg.chat.id));
-  bot.onText(/\/menu(?:@[\w_]+)?$/, async (msg) => {
-    await telegram.sendMessage(msg.chat.id, 'Quick actions:', {
-      reply_markup: getMainMenu(),
+  bot.command('app', async (ctx) => {
+    const chatId = ctx.chat.id;
+    const username = ctx.from?.username;
+    const webappUrl = ctx.env.WEBHOOK_URL ? ctx.env.WEBHOOK_URL.replace(/\/$/, '') : null;
+    
+    let message = `📱 *Web App Access*\n\n`;
+    
+    if (username) {
+      message += `Your Username: \`@${username}\`\n`;
+    } else {
+      message += `Your Chat ID: \`${chatId}\`\n`;
+    }
+    
+    message += '\n';
+
+    if (webappUrl) {
+      message += `🔗 [Open Dashboard](${webappUrl}/app)\n\n`;
+    }
+    
+    message += `1️⃣ Open the dashboard\n2️⃣ Enter your ${username ? 'Username' : 'Chat ID'}\n3️⃣ Click "Request OTP"\n4️⃣ I will send you a login code here!`;
+
+    await ctx.reply(message, { 
+      parse_mode: 'Markdown',
+      link_preview_options: { is_disabled: true }
     });
-    await showKeyboard(msg.chat.id);
-  });
-  bot.onText(/\/balance(?:@[\w_]+)?$/, async (msg) => sendBalance(msg.chat.id));
-  bot.onText(/\/settings(?:@[\w_]+)?$/, async (msg) =>
-    renderSettingsMenu(msg.chat.id)
-  );
-  bot.onText(/\/hidekeyboard(?:@[\w_]+)?$/, async (msg) =>
-    hideKeyboard(msg.chat.id)
-  );
-  bot.onText(/\/showkeyboard(?:@[\w_]+)?$/, async (msg) =>
-    showKeyboard(msg.chat.id)
-  );
-
-  bot.onText(/^💰\s*Balance$/i, async (msg) => sendBalance(msg.chat.id));
-  bot.onText(/^🤖\s*Models$/i, async (msg) => {
-    try {
-      await renderModelsMenu(msg.chat.id);
-    } catch (e) {
-      log.error('[models-list-error]', e);
-      await telegram.sendMessage(
-        msg.chat.id,
-        'Failed to fetch structured-output models from Groq.'
-      );
-    }
-  });
-  bot.onText(/^⚙️\s*Settings$/i, async (msg) =>
-    renderSettingsMenu(msg.chat.id)
-  );
-  bot.onText(/^ℹ️\s*Help$/i, async (msg) => sendHelp(msg.chat.id));
-  bot.onText(/^🙈\s*Hide Keyboard$/i, async (msg) => hideKeyboard(msg.chat.id));
-
-  bot.onText(/\/models(?:@[\w_]+)?$/, async (msg) => {
-    const chatId = msg.chat.id;
-    try {
-      await telegram.sendChatAction(chatId, 'typing');
-      await renderModelsMenu(chatId);
-    } catch (e) {
-      log.error('[models-list-error]', e);
-      await telegram.sendMessage(
-        chatId,
-        'Failed to fetch structured-output models from Groq.'
-      );
-    }
   });
 
-  bot.onText(/\/model(?:@[\w_]+)?(?:\s+(.+))?$/, async (msg, match) => {
-    const chatId = msg.chat.id;
-    const requestedModel = (match?.[1] ?? '').trim();
+  bot.command('setkey', async (ctx) => {
+    const userId = ctx.from?.id;
+    if (!userId) return;
 
-    if (!requestedModel) {
-      await renderModelsMenu(chatId);
+    const apiKey = ctx.match?.trim();
+
+    if (!apiKey) {
+      await ctx.reply('Usage: /setkey <your_groq_api_key>');
       return;
     }
 
-    try {
-      const result = await modelConfig.setCurrentModel(requestedModel);
-      if (!result.ok) {
-        await telegram.sendMessage(
-          chatId,
-          `Model is not in structured-output list: ${requestedModel}\nUse /models and pick one from the buttons.`
-        );
-        return;
-      }
+    const { userConfigStore } = getServices(ctx);
+    await userConfigStore.setGroqApiKey(userId, apiKey);
+    await ctx.reply('✅ Your Groq API key has been saved.');
+  });
 
-      await telegram.sendMessage(
-        chatId,
-        `✅ Model updated to: ${result.currentModel}`,
-        { reply_markup: maybeChatKeyboard(chatId) }
+  bot.command('removekey', async (ctx) => {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    const { userConfigStore } = getServices(ctx);
+    await userConfigStore.removeGroqApiKey(userId);
+    await ctx.reply('🗑️ Your Groq API key has been removed.');
+  });
+
+  bot.command('keystatus', async (ctx) => {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    const { userConfigStore } = getServices(ctx);
+    const key = await userConfigStore.getGroqApiKey(userId);
+    await ctx.reply(key ? '✅ Groq API key is set.' : '❌ Groq API key is not set.');
+  });
+
+  bot.command('clear', async (ctx) => {
+    const chatId = ctx.chat.id;
+    const lastMessageId = ctx.message?.message_id;
+
+    if (!lastMessageId) return;
+
+    const feedback = await ctx.reply('🧹 *Cleaning up chat (deep sweep)...*', { parse_mode: 'Markdown' });
+
+    // Deep sweep: Check the last 500 potential message IDs.
+    // In low-traffic bots, message IDs can have large gaps.
+    const range = 500;
+    const messageIds = Array.from({ length: range }, (_, i) => lastMessageId - i);
+    
+    const batchSize = 100;
+    for (let i = 0; i < messageIds.length; i += batchSize) {
+      const chunk = messageIds.slice(i, i + batchSize);
+      // Run each batch in parallel
+      await Promise.all(
+        chunk.map(id => ctx.api.deleteMessage(chatId, id).catch(() => {}))
       );
-    } catch (e) {
-      log.error('[model-set-error]', e);
-      await telegram.sendMessage(chatId, 'Failed to update model.');
     }
+    
+    // Also try to delete the "cleaning up" message
+    await ctx.api.deleteMessage(chatId, feedback.message_id).catch(() => {});
+
+    await ctx.reply('✨ *Chat cleaned.*', {
+      parse_mode: 'Markdown',
+      reply_markup: getChatKeyboard()
+    });
   });
 
-  bot.on('callback_query', async (query) => {
-    const data = query.data;
-    const chatId = query.message?.chat.id;
-    const messageId = query.message?.message_id;
-
-    if (!data || !chatId || !messageId) return;
-
-    try {
-      if (data.startsWith('ui:')) {
-        if (data === 'ui:menu') {
-          await telegram.answerCallbackQuery(query.id);
-          await telegram.editMessageText('Quick actions:', {
-            chat_id: chatId,
-            message_id: messageId,
-            reply_markup: getMainMenu(),
-          });
-          return;
-        }
-
-        if (data === 'ui:help') {
-          await telegram.answerCallbackQuery(query.id);
-          await sendHelp(chatId);
-          return;
-        }
-
-        if (data === 'ui:balance') {
-          await telegram.answerCallbackQuery(query.id);
-          await sendBalance(chatId);
-          return;
-        }
-
-        if (data === 'ui:models') {
-          await telegram.answerCallbackQuery(query.id);
-          await renderModelsMenu(chatId, messageId);
-          return;
-        }
-
-        if (data === 'ui:settings') {
-          await telegram.answerCallbackQuery(query.id);
-          await renderSettingsMenu(chatId, messageId);
-          return;
-        }
-      }
-
-      if (data.startsWith('settings:')) {
-        if (data === 'settings:toggle-verbose') {
-          const prefs = getPrefs(chatId);
-          prefs.verbose = !prefs.verbose;
-          await telegram.answerCallbackQuery(query.id, {
-            text: `Verbose ${prefs.verbose ? 'enabled' : 'disabled'}`,
-          });
-          await renderSettingsMenu(chatId, messageId);
-          return;
-        }
-
-        if (data === 'settings:currency:rs' || data === 'settings:currency:inr') {
-          const prefs = getPrefs(chatId);
-          prefs.currency = data.endsWith(':inr') ? 'inr' : 'rs';
-          await telegram.answerCallbackQuery(query.id, {
-            text: `Currency set to ${prefs.currency === 'inr' ? '₹' : 'Rs.'}`,
-          });
-          await renderSettingsMenu(chatId, messageId);
-          return;
-        }
-
-        if (data === 'settings:hide-keyboard') {
-          await telegram.answerCallbackQuery(query.id, { text: 'Keyboard hidden' });
-          await hideKeyboard(chatId);
-          await renderSettingsMenu(chatId, messageId);
-          return;
-        }
-
-        if (data === 'settings:show-keyboard') {
-          await telegram.answerCallbackQuery(query.id, { text: 'Keyboard shown' });
-          await showKeyboard(chatId);
-          await renderSettingsMenu(chatId, messageId);
-          return;
-        }
-      }
-
-      if (!data.startsWith('models:')) return;
-
-      if (data === 'models:noop') {
-        await telegram.answerCallbackQuery(query.id);
-        return;
-      }
-
-      if (data === 'models:refresh') {
-        await telegram.answerCallbackQuery(query.id, {
-          text: 'Refreshing model list...',
-        });
-        await renderModelsMenu(chatId, messageId, 0, true);
-        return;
-      }
-
-      if (data.startsWith('models:page:')) {
-        const page = Number(data.split(':')[2] ?? '0');
-        await telegram.answerCallbackQuery(query.id);
-        await renderModelsMenu(chatId, messageId, Number.isNaN(page) ? 0 : page);
-        return;
-      }
-
-      if (data.startsWith('models:set:')) {
-        const modelId = data.slice('models:set:'.length);
-        const result = await modelConfig.setCurrentModel(modelId);
-
-        if (!result.ok) {
-          await telegram.answerCallbackQuery(query.id, {
-            text: 'Model unavailable for structured output',
-            show_alert: true,
-          });
-          await renderModelsMenu(chatId, messageId, 0, true);
-          return;
-        }
-
-        await telegram.answerCallbackQuery(query.id, { text: `Using ${modelId}` });
-        await renderModelsMenu(chatId, messageId);
-      }
-    } catch (e) {
-      log.error('[models-callback-error]', e);
-      await telegram.answerCallbackQuery(query.id, {
-        text: 'Failed to handle action',
-        show_alert: true,
-      });
-    }
+  bot.command('help', async (ctx) => sendHelp(ctx, ctx.chat.id));
+  bot.command('menu', async (ctx) => {
+    await ctx.reply('Quick actions:', { reply_markup: getMainMenu() });
+    await ctx.reply('Keyboard enabled ⌨️', { reply_markup: getChatKeyboard() });
   });
+  bot.command('balance', async (ctx) => sendBalance(ctx, ctx.chat.id));
+  bot.command('transactions', async (ctx) => sendRecentTransactions(ctx, ctx.chat.id));
 
-  bot.on('message', async (msg) => {
-    const chatId = msg.chat.id;
+  bot.hears(/^💰\s*Balance$/i, async (ctx) => sendBalance(ctx, ctx.chat.id));
+  bot.hears(/^📒\s*Transactions$/i, async (ctx) => sendRecentTransactions(ctx, ctx.chat.id));
+  bot.hears(/^ℹ️\s*Help$/i, async (ctx) => sendHelp(ctx, ctx.chat.id));
 
-    if (msg.pinned_message) {
-      try {
-        await telegram.deleteMessage(chatId, msg.message_id);
-      } catch {
-        // Ignore if we can't delete
-      }
+  bot.on('callback_query:data', async (ctx) => {
+    const data = ctx.callbackQuery.data;
+    const chatId = ctx.callbackQuery.message?.chat.id;
+
+    if (!data || !chatId) return;
+
+    if (data === 'ui:help') {
+      await ctx.answerCallbackQuery();
+      await sendHelp(ctx, chatId);
       return;
     }
 
-    if (msg.from?.is_bot) return;
+    if (data === 'ui:balance') {
+      await ctx.answerCallbackQuery();
+      await sendBalance(ctx, chatId);
+      return;
+    }
 
-    const text = (msg.text ?? msg.caption ?? '').trim();
-    if (!text) return;
-    if (text.startsWith('/')) return;
+    if (data === 'ui:transactions') {
+      await ctx.answerCallbackQuery();
+      await sendRecentTransactions(ctx, chatId);
+      return;
+    }
+  });
 
+  bot.on('message:text', async (ctx) => {
+    const chatId = ctx.chat.id;
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    const text = ctx.message.text.trim();
+
+    if (!text || text.startsWith('/')) return;
     if (
       /^💰\s*Balance$/i.test(text) ||
-      /^🤖\s*Models$/i.test(text) ||
-      /^⚙️\s*Settings$/i.test(text) ||
-      /^ℹ️\s*Help$/i.test(text) ||
-      /^🙈\s*Hide Keyboard$/i.test(text)
-    ) {
+      /^📒\s*Transactions$/i.test(text) ||
+      /^ℹ️\s*Help$/i.test(text)
+    )
       return;
-    }
 
     try {
-      const start = Date.now();
-      await telegram.sendChatAction(chatId, 'typing');
-      log.debug('[extract-input]', text);
-      const extracted = await ai.extractTransactions(text);
-      const duration = Date.now() - start;
-      log.debug('[extract-output]', extracted, `(${duration}ms)`);
+      const { transactionManager } = getServices(ctx);
 
-      if (!extracted.items.length) return;
+      const userGroqToken = await requireUserGroqKey(ctx, userId);
+      if (!userGroqToken) return;
 
-      const { net } = computeTotals(extracted.items);
-      const { balance: currentBalance } =
-        await balanceService.getPinnedBalance(chatId);
+      const processingMsg = await ctx.reply('⏳ _Processing your message..._', {
+        parse_mode: 'Markdown',
+      });
 
-      if (currentBalance === null) {
-        log.debug('[balance-skip] no pinned balance; ignoring message');
-        await telegram.sendMessage(
-          chatId,
-          'I found transactions, but there is no pinned balance yet. Use /start first.'
-        );
+      await ctx.api.sendChatAction(chatId, 'typing');
+      const result = await transactionManager.processUserMessage(chatId, userId, text, userGroqToken);
+
+      if (!result) {
+        await ctx.api.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
         return;
       }
 
-      const newBalance = currentBalance + net;
+      await ctx.api.editMessageText(
+        chatId,
+        processingMsg.message_id,
+        [
+          `✅ Recorded ${result.items.length} transaction(s)`,
+          ...result.items.map(item => `• ${item.type === 'Expense' ? '-' : '+'}${formatMoney(item.amount)}${item.note ? ` (${item.note})` : ''}`),
+          `\nNet change: ${result.net >= 0 ? '+' : ''}${formatMoney(result.net)}`,
+          `New balance: ${formatMoney(result.newBalance)}`
+        ].join('\n')
+      );
 
-      try {
-        const pinnedMessageId = await balanceService.sendAndPinBalance(
-          chatId,
-          newBalance
-        );
-        log.info(
-          '[balance] prev=',
-          currentBalance,
-          'new=',
-          newBalance,
-          'net=',
-          net,
-          'pinnedMessageId=',
-          pinnedMessageId
-        );
-
-        if (getPrefs(chatId).verbose) {
-          await telegram.sendMessage(
-            chatId,
-            `✅ Recorded ${extracted.items.length} transaction(s)\nNet change: ${net >= 0 ? '+' : ''}${formatMoney(chatId, net)}\nNew balance: ${formatMoney(chatId, newBalance)}`,
-            { reply_markup: maybeChatKeyboard(chatId) }
-          );
-        } else {
-          await telegram.sendMessage(chatId, `✅ ${formatMoney(chatId, newBalance)}`, {
-            reply_markup: maybeChatKeyboard(chatId),
-          });
-        }
-      } catch (e) {
-        console.error('[balance-pin-error]', e);
-      }
-    } catch (err) {
+      // Reply keyboard cannot be attached via editMessageText, so we send a separate message
+      // or just rely on the existing persistent keyboard. 
+      // Since the user just sent a message, the keyboard is likely already visible.
+    } catch (err: any) {
       log.error('[extract-error]', err);
+      await ctx.reply('Failed to process message. Check your Groq API key and try again.');
     }
   });
 };

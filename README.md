@@ -1,123 +1,84 @@
-````markdown
-# Telegram Budget Bot
+# Telegram Budget Bot (Cloudflare Workers)
 
-A simple, maintainable Telegram-based budget tracker that extracts transactions from text, updates a pinned balance message, and keeps your group's balance visible.
+Telegram budget tracker running on **Cloudflare Workers** using:
+- **Hono** for webhook HTTP routing
+- **grammY** for Telegram bot handling
+- **D1** for per-user config (Groq API key) and per-chat transaction history
+- **Groq** for transaction extraction
 
-## Features
+## Notes
 
-- Extract transactions (deposits/expenses) using an AI-based extractor
-- Maintain and pin a shared balance in group chats
-- List only Groq models that support structured output (`/models`)
-- Interactive model picker with inline buttons (pagination + refresh)
-- Change the active model at runtime (`/model <model-id>` or button tap)
-- Reusable services and modular code for future extensions
+- No Durable Objects
+- No model picker
+- Per-user Groq API key is required for message processing
 
-## Project Structure (opinionated)
+The bot uses a single model from `AI_MODEL` (or default fallback).
 
-```
-src/
-  bot/
-    index.ts              # Bot factory and bootstrapping
-    handlers.ts           # Message handlers
-    transactions.ts       # Compute totals and types
-    balance.ts            # Balance service (encapsulates pin/get)
-    types.ts              # Domain types
-  server/
-    app.ts                # Express app factory
-    main.ts               # App entrypoint and webhook setup
-  services/
-    ai.ts                 # AI extraction service
-    telegram.ts           # Telegram API wrapper
-  config/
-    env.ts                # typed environment variables
-    logger.ts             # minimal logger abstraction
-  utils/
-    parser.ts             # parsing helpers
-  test/                   # unit tests (Bun)
-  index.ts                # public exports
+## Required bindings / vars
+
+Configure in `wrangler.jsonc` / `wrangler secret`:
+
+- `BOT_TOKEN`
+- `DB` (D1 binding)
+- `AI_MODEL` (optional, has default)
+- `WEBHOOK_URL` (optional; if set, bot auto-calls Telegram `setWebhook` to `${WEBHOOK_URL}/webhook` on first request)
+- `WEBAPP_AUTH_SECRET` (recommended, used to sign OTP/session tokens for `/app` web login)
+
+## D1 setup
+
+1. Create DB:
+```bash
+wrangler d1 create telegram_budget_bot
 ```
 
-## Environment Variables
+2. Put returned `database_id` in `wrangler.jsonc`.
 
-Create a `.env` file in the project root with the following values (example):
-
-```
-TOKEN=<telegram_bot_token>
-URL=<public_https_url_for_webhook>
-PORT=3001
-GROQ_TOKEN=<groq_ai_key>
-AI_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
+3. Apply migrations:
+```bash
+npm run db:migrate:local
+# or for deployed DB
+npm run db:migrate:remote
 ```
 
-`URL` is required when using webhook mode and deploying to a public server.
+Schema is managed explicitly via SQL files in `migrations/`.
 
-## Model Commands
+## Commands
 
-- `/models` → opens interactive picker (only structured-output models)
-- `/model` → opens the same interactive picker
-- `/model <model-id>` → switches active model for new AI calls
+- `/start` Initialize and pin balance, then prompts for Groq key
+- `/setkey <groq_key>` Save/update your Groq API key
+- `/removekey` Remove your saved key
+- `/keystatus` Check if key is set
+- `/balance` Show current balance
+- `/transactions` Show recent transaction history
+- `/help` Show help
 
-The picker includes inline buttons, pagination, and refresh.
-
-## Chat Keyboard
-
-The bot enables a persistent reply keyboard with quick actions:
-- `💰 Balance`
-- `🤖 Models`
-- `⚙️ Settings`
-- `ℹ️ Help`
-- `🙈 Hide Keyboard`
-
-You can also use:
-- `/settings` for interactive settings menu
-- `/hidekeyboard` to remove the keyboard
-- `/showkeyboard` to bring it back
-- `/menu` to re-open the inline menu + keyboard
-
-Settings currently support currency format and verbose/concise confirmations.
-
-Note: model changes and settings are in-memory and reset on app restart.
-
-## Development
-
-Install dependencies and run the project for local development (Bun):
+## Local development
 
 ```bash
-bun install
-bun run dev
+npm install
+npm run web:build
+npm run dev
 ```
 
-Run tests:
+Web app is served from `/app` and uses OTP login sent to Telegram.
+
+## Deploy
 
 ```bash
-bun test
+npm run build
+npm run deploy
 ```
 
-## Production
+## Telegram webhook
 
-Build and run (TypeScript -> JS then run):
+After deploy, set webhook URL to:
 
+```text
+https://<your-worker-domain>/webhook
+```
+
+Example:
 ```bash
-bun install
-bun run build
-node ./dist/server/main.js
+curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook" \
+  -d "url=https://<your-worker-domain>/webhook"
 ```
-
-## Best Practices in this refactor
-
-- Use an app factory and entrypoint for easy testing and separation of concerns.
-- Create small, composable services (AI service, Telegram wrapper, Balance service) for easier unit testing and maintainability.
-- Export `createBot` for test-time dependency injection.
-- Replace console.log usage with a `logger` abstraction for structured logs.
-- Add unit tests for core pure functions (totals and parsing).
-
-## Next steps
-
-- Add CI (GitHub Actions) to run lint, typecheck, and tests.
-- Add E2E tests for webhook flow using a mock Telegram client.
-- Add a persistent storage option for transactions and balances.
-
-```
-
-```
-````

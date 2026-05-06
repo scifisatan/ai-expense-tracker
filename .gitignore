@@ -4,3 +4,5 @@ budgetDB.json
 .vercel
 docs/
 dist/
+web/dist/
+.wrangler/

@@ -1,18 +1,14 @@
-import { createTelegramService } from '../services/telegram';
-import type TelegramBot from 'node-telegram-bot-api';
+import type { Api } from 'grammy';
 import { parseBalance } from '../utils/parser';
 import type { BalanceInfo } from './types';
 
-export const createBalanceService = (bot: TelegramBot) => {
-  const ts = createTelegramService(bot);
-
+export const createBalanceService = (api: Api) => {
   return {
     async getPinnedBalance(chatId: number): Promise<BalanceInfo> {
       try {
-        const chatInfo = await ts.getChat(chatId);
-        const pinned = (chatInfo as any).pinned_message as
-          | TelegramBot.Message
-          | undefined;
+        const chatInfo = await api.getChat(chatId);
+        const pinned = (chatInfo as any).pinned_message;
+
         if (pinned?.text) {
           const parsed = parseBalance(pinned.text);
           if (parsed !== null) {
@@ -22,13 +18,16 @@ export const createBalanceService = (bot: TelegramBot) => {
       } catch (e) {
         console.error('[balance-fetch-error]', e);
       }
+
       return { balance: null };
     },
 
     async sendAndPinBalance(chatId: number, balance: number) {
-      const balanceText = `Remaining Balance: Rs. ${balance}`;
-      const balanceMsg = await ts.sendMessage(chatId, balanceText);
-      await ts.pinMessage(chatId, balanceMsg.message_id, true);
+      const balanceText = `💰 Current Balance: Rs. ${balance}`;
+      const balanceMsg = await api.sendMessage(chatId, balanceText);
+      await api.pinChatMessage(chatId, balanceMsg.message_id, {
+        disable_notification: true,
+      });
       return balanceMsg.message_id;
     },
   };
