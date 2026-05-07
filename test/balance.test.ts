@@ -33,7 +33,7 @@ describe("balance service", () => {
     };
     const service = createBalanceService(mockApi as any);
     const messageId = await service.sendAndPinBalance(123, 2000);
-    
+
     expect(mockApi.sendMessage).toHaveBeenCalledWith(123, expect.stringContaining("2000"));
     expect(mockApi.pinChatMessage).toHaveBeenCalledWith(123, 789, { disable_notification: true });
     expect(messageId).toBe(789);
@@ -46,7 +46,7 @@ describe("balance service", () => {
     };
     const service = createBalanceService(mockApi as any);
     const result = await service.getPinnedBalance(123);
-    
+
     expect(result.balance).toBeNull();
     expect(spy).toHaveBeenCalled();
     spy.mockRestore();

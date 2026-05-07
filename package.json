@@ -17,6 +17,8 @@
     "lint": "oxlint .",
     "format": "oxfmt . --write",
     "test": "vitest run",
+    "check:architecture": "node scripts/check-domain-imports.mjs",
+    "ci:architecture": "npm run check:architecture",
     "test:watch": "vitest"
   },
   "dependencies": {

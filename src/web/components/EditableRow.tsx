@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { money } from "../helper";
 import { Transaction } from "../types";
+import { TransactionType } from "@/domain/ledger/types";
 
 const EditableRow = ({
   tx,
@@ -84,7 +85,7 @@ const EditableRow = ({
       <td className="checkbox-cell"></td>
       <td className="td-id">#{tx.id}</td>
       <td>
-        <select className="inline-select" value={type} onChange={(e) => setType(e.target.value)}>
+        <select className="inline-select" value={type} onChange={(e) => setType(e.target.value as TransactionType)}>
           <option value="Income">Income</option>
           <option value="Expense">Expense</option>
         </select>

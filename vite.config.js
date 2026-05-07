@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [cloudflare(), ssrPlugin()],
   server: {
     allowedHosts: true,
-    port: "3001"
+    port: "3001",
   },
   test: {
     environment: "node",

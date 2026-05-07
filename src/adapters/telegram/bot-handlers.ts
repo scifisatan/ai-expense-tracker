@@ -1,15 +1,8 @@
 import { InlineKeyboard } from "grammy";
 import type { Bot } from "grammy";
-import { log } from "../config/logger";
-import { createTransactionManager } from "../services/transaction-manager";
-import { createTransactionStore } from "../storage/transaction-store";
-import { createUserStore } from "../storage/user-store";
-import { createUserConfigStore } from "../storage/user-config";
-import type { BotContext } from "./index";
-
-import { TelegramLedgerAdapter } from "../services/ledger-display/telegram-adapter";
-
-const DEFAULT_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+import { log } from "../../utils/logger";
+import type { BotContext } from "../../bot";
+import { createAppContext } from "../../bootstrap/create-app-context";
 
 const getMainMenu = () =>
   new InlineKeyboard()
@@ -41,15 +34,20 @@ const getMissingKeyWarning = () =>
   ].join("\n");
 
 export const registerHandlers = (bot: Bot<BotContext>) => {
-  const getServices = (ctx: BotContext) => ({
-    userStore: createUserStore(ctx.env.DB),
-    userConfigStore: createUserConfigStore(ctx.env.DB),
-    transactionManager: createTransactionManager({
-      db: ctx.env.DB,
-      aiModel: ctx.env.AI_MODEL ?? DEFAULT_MODEL,
-      display: new TelegramLedgerAdapter(ctx.env.BOT_TOKEN!),
-    }),
-  });
+  const getServices = (ctx: BotContext) => {
+    const appContext = createAppContext({ db: ctx.env.DB, env: ctx.env });
+
+    if (!appContext.transactionManager) {
+      throw new Error("BOT_TOKEN is required for transaction manager");
+    }
+
+    return {
+      userStore: appContext.userStore,
+      userConfigStore: appContext.userConfigStore,
+      transactionManager: appContext.transactionManager,
+      ledger: appContext.ledger,
+    };
+  };
 
   const requireUserGroqKey = async (ctx: BotContext, userId: number) => {
     const { userConfigStore } = getServices(ctx);
@@ -91,14 +89,13 @@ export const registerHandlers = (bot: Bot<BotContext>) => {
   };
 
   const sendBalance = async (ctx: BotContext, chatId: number) => {
-    const { transactionManager } = getServices(ctx);
-    // This updates the pinned message and current balance state
-    await transactionManager.refreshPinnedBalance(chatId);
+    const { ledger } = getServices(ctx);
+    await ledger.refreshBalance(chatId);
   };
 
   const sendRecentTransactions = async (ctx: BotContext, chatId: number) => {
-    const store = createTransactionStore(ctx.env.DB);
-    const transactions = await store.listRecent(chatId, 10);
+    const { ledger } = getServices(ctx);
+    const transactions = await ledger.listRecent(chatId, 10);
 
     if (!transactions.length) {
       await ctx.api.sendMessage(chatId, "📭 No transactions recorded yet.", {
@@ -125,7 +122,7 @@ export const registerHandlers = (bot: Bot<BotContext>) => {
     if (!user) return;
 
     try {
-      const { transactionManager, userConfigStore, userStore } = getServices(ctx);
+      const { ledger, userConfigStore, userStore } = getServices(ctx);
 
       await userStore.ensureUser({
         id: user.id,
@@ -134,7 +131,7 @@ export const registerHandlers = (bot: Bot<BotContext>) => {
         last_name: user.last_name,
       });
 
-      const currentBalance = await transactionManager.refreshPinnedBalance(chatId);
+      const currentBalance = await ledger.refreshBalance(chatId);
       const existingKey = await userConfigStore.getGroqApiKey(user.id);
 
       await ctx.reply(

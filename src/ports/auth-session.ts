@@ -10,7 +10,7 @@ export interface OtpChallengePayload {
   exp: number;
 }
 
-export interface SessionManager {
+export interface AuthSession {
   issueSession(chatId: number): Promise<string>;
   verifySession(token: string): Promise<SessionPayload | null>;
   issueOtpChallenge(chatId: number): Promise<{ challengeToken: string; otp: string }>;

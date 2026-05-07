@@ -1,14 +1,11 @@
 /** @jsxImportSource hono/jsx */
-import type { Update } from "grammy/types";
-import { Hono } from "hono";
-import { createBot } from "./bot";
-import { createTransactionManager } from "./services/transaction-manager";
-import { TelegramLedgerAdapter } from "./services/ledger-display/telegram-adapter";
-import { TokenSessionManager } from "./services/auth/token-manager";
-import { createTransactionStore } from "./storage/transaction-store";
-import { Script, Link, ViteClient } from "vite-ssr-components/hono";
-import { router } from "./router";
 import { trpcServer } from "@hono/trpc-server";
+import type { Update } from "grammy/types";
+import { Hono, type Context } from "hono";
+import { Link, Script, ViteClient } from "vite-ssr-components/hono";
+import { createBot } from "./bot";
+import { router } from "./adapters/trpc/router";
+import { createAppContext, getAuthSecret } from "./bootstrap/create-app-context";
 
 export type CloudflareBindings = {
   BOT_TOKEN?: string;
@@ -19,49 +16,49 @@ export type CloudflareBindings = {
   ASSETS?: Fetcher;
 };
 
-const app = new Hono<{ Bindings: CloudflareBindings }>();
+type AppEnv = { Bindings: CloudflareBindings };
+type AppContext = Context<AppEnv>;
 
+const SESSION_COOKIE = "budget_session";
+
+const app = new Hono<AppEnv>();
 let webhookInitPromise: Promise<void> | null = null;
 
-const getAuthSecret = (env: CloudflareBindings) => env.WEBAPP_AUTH_SECRET ?? env.BOT_TOKEN ?? null;
+const getAuth = (env: CloudflareBindings) => {
+  const authSecret = getAuthSecret(env);
+  if (!authSecret) throw new Error("Missing auth secret");
 
-const getSessionManager = (env: CloudflareBindings) => {
-  const secret = getAuthSecret(env);
-  if (!secret) throw new Error("Missing auth secret");
-  return new TokenSessionManager(secret);
+  return createAppContext({ db: env.DB, env }).createSessionAuthModule();
 };
 
 const parseCookies = (cookieHeader: string | null) => {
-  const out = new Map<string, string>();
-  if (!cookieHeader) return out;
+  const cookies = new Map<string, string>();
+  if (!cookieHeader) return cookies;
+
   for (const part of cookieHeader.split(";")) {
     const [rawKey, ...rest] = part.trim().split("=");
     if (!rawKey || rest.length === 0) continue;
-    out.set(rawKey, rest.join("="));
+    cookies.set(rawKey, rest.join("="));
   }
-  return out;
+
+  return cookies;
 };
 
-const getSessionChatId = async (req: Request, env: CloudflareBindings): Promise<number | null> => {
-  const cookies = parseCookies(req.headers.get("cookie"));
-  const token = cookies.get("budget_session");
-  if (!token) return null;
+const getSessionChatId = async (
+  request: Request,
+  env: CloudflareBindings,
+): Promise<number | null> => {
+  const cookies = parseCookies(request.headers.get("cookie"));
+  const sessionToken = cookies.get(SESSION_COOKIE);
+  if (!sessionToken) return null;
 
   try {
-    const manager = getSessionManager(env);
-    const payload = await manager.verifySession(token);
-    return payload?.chatId ?? null;
+    const auth = getAuth(env);
+    return auth.getSessionChatId(sessionToken);
   } catch {
     return null;
   }
 };
-
-const getTransactionManager = (env: CloudflareBindings) =>
-  createTransactionManager({
-    db: env.DB,
-    aiModel: env.AI_MODEL ?? "meta-llama/llama-4-scout-17b-16e-instruct",
-    display: new TelegramLedgerAdapter(env.BOT_TOKEN!),
-  });
 
 const ensureWebhookConfigured = async (env: CloudflareBindings) => {
   if (!env.WEBHOOK_URL) return;
@@ -114,12 +111,40 @@ const ensureWebhookConfigured = async (env: CloudflareBindings) => {
     }
 
     console.info("[webhook-auto-setup] configured", { url: desiredWebhookUrl });
-  })().catch((err) => {
-    console.error("[webhook-auto-setup-error]", err);
+  })().catch((error) => {
+    console.error("[webhook-auto-setup-error]", error);
     webhookInitPromise = null;
   });
 
   await webhookInitPromise;
+};
+
+const getPathToken = (path: string) => {
+  if (!path.startsWith("/bot")) return "";
+  const rawPathToken = path.slice("/bot".length);
+  return rawPathToken.startsWith("/") ? rawPathToken.slice(1) : rawPathToken;
+};
+
+const handleUpdate = async (c: AppContext, source: "webhook" | "token-path") => {
+  try {
+    const update = (await c.req.json()) as Update;
+    const updateType = Object.keys(update).find((key) => key !== "update_id");
+
+    console.info("[webhook-received]", {
+      source,
+      updateId: update.update_id,
+      type: updateType,
+    });
+
+    const bot = createBot(c.env);
+    await bot.init();
+    await bot.handleUpdate(update);
+
+    return c.json({ ok: true });
+  } catch (error) {
+    console.error("[webhook-error]", error);
+    return c.json({ ok: false, error: "Failed to process update" }, 500);
+  }
 };
 
 app.use("*", async (c, next) => {
@@ -155,49 +180,28 @@ app.all("/api/*", async (c, next) => {
       env: c.env,
     }),
   });
-  const res = await handler(c, next);
-  return res;
+
+  return handler(c, next);
 });
 
 app.get("/webhook", (c) =>
   c.json({ ok: true, message: "Webhook endpoint is alive. Use POST for Telegram updates." }),
 );
 
-const handleUpdate = async (c: any, source: "webhook" | "token-path") => {
-  try {
-    const update = (await c.req.json()) as Update;
-    console.info("[webhook-received]", {
-      source,
-      updateId: update.update_id,
-      type: Object.keys(update).filter((k) => k !== "update_id")[0],
-    });
-
-    const bot = createBot(c.env);
-    await bot.init();
-    await bot.handleUpdate(update);
-
-    return c.json({ ok: true });
-  } catch (error) {
-    console.error("[webhook-error]", error);
-    return c.json({ ok: false, error: "Failed to process update" }, 500);
-  }
-};
-
 app.post("/webhook", async (c) => handleUpdate(c, "webhook"));
 
 // Supports Telegram webhook URLs in the form /bot<token> (and /bot/<token>)
 app.post("/bot*", async (c) => {
   const effectiveToken = c.env.BOT_TOKEN;
-  const path = c.req.path;
-  let pathToken = path.startsWith("/bot") ? path.slice("/bot".length) : "";
-  if (pathToken.startsWith("/")) pathToken = pathToken.slice(1);
+  const pathToken = getPathToken(c.req.path);
 
   if (!effectiveToken || pathToken !== effectiveToken) {
     console.warn("[webhook-rejected]", {
       reason: "token_mismatch",
       hasEffectiveToken: Boolean(effectiveToken),
-      path,
+      path: c.req.path,
     });
+
     return c.json({ ok: false, error: "Invalid bot token in path" }, 403);
   }
 
@@ -221,4 +225,5 @@ app.get("/app", (c) => {
     </html>,
   );
 });
+
 export default app;

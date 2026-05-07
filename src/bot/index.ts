@@ -1,7 +1,7 @@
 import { Bot } from "grammy";
 import type { Context } from "grammy";
 import type { CloudflareBindings } from "../index";
-import { registerHandlers } from "./handlers";
+import { registerHandlers } from "../adapters/telegram/bot-handlers";
 
 export type BotContext = Context & {
   env: CloudflareBindings;

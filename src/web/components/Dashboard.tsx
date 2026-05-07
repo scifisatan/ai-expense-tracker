@@ -5,10 +5,18 @@ import EditableRow from "./EditableRow";
 import { trpc } from "../trpc";
 
 const Dashboard = ({ chatId, onLogout }: { chatId: number | null; onLogout: () => void }) => {
-  const { data: txData, isLoading: isTxLoading, refetch: refetchTx } = trpc.transactions.list.useQuery({ limit: 200 });
-  const { data: summary, isLoading: isSumLoading, refetch: refetchSum } = trpc.insights.summary.useQuery();
+  const {
+    data: txData,
+    isLoading: isTxLoading,
+    refetch: refetchTx,
+  } = trpc.transactions.list.useQuery({ limit: 200 });
+  const {
+    data: summary,
+    isLoading: isSumLoading,
+    refetch: refetchSum,
+  } = trpc.insights.summary.useQuery();
 
-  const transactions = (txData?.items ?? []) as Transaction[];
+  const transactions: Transaction[] = txData?.items ?? [];
 
   const updateMutation = trpc.transactions.update.useMutation();
   const deleteMutation = trpc.transactions.delete.useMutation();
@@ -32,7 +40,7 @@ const Dashboard = ({ chatId, onLogout }: { chatId: number | null; onLogout: () =
         id: tx.id,
         amount: patch.amount,
         type: patch.type,
-        note: patch.note === undefined ? undefined : patch.note
+        note: patch.note === undefined ? undefined : patch.note,
       });
       setStatus("Saved ✓");
       setTimeout(() => setStatus(""), 2500);
@@ -113,7 +121,8 @@ const Dashboard = ({ chatId, onLogout }: { chatId: number | null; onLogout: () =
     </th>
   );
 
-  if (isTxLoading || isSumLoading) return <div className="p-8 text-center text-gray-500">Loading Dashboard...</div>;
+  if (isTxLoading || isSumLoading)
+    return <div className="p-8 text-center text-gray-500">Loading Dashboard...</div>;
 
   return (
     <div className="app-shell">

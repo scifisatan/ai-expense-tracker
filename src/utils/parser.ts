@@ -2,7 +2,9 @@ export const parseBalance = (text: string): number | null => {
   const cleaned = text.trim();
 
   // 1. Check for "Balance" related keywords
-  const balanceMatch = cleaned.match(/(?:remaining|current|total)?\s*balance\s*:?\s*r?s?\.?\s*(-?[\d,.]+)/i);
+  const balanceMatch = cleaned.match(
+    /(?:remaining|current|total)?\s*balance\s*:?\s*r?s?\.?\s*(-?[\d,.]+)/i,
+  );
   if (balanceMatch?.[1]) {
     const val = Number(balanceMatch[1].replace(/,/g, ""));
     if (!isNaN(val)) return val;

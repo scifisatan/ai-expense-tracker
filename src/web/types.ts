@@ -1,12 +1,12 @@
-type SessionResponse = { authenticated: boolean; chatId: number | null };
-type Transaction = {
-  id: number;
-  amount: number;
-  type: string;
-  note: string | null;
-  createdAt: string;
-};
-type Summary = { income: number; expense: number; net: number; transactions: number };
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "../adapters/trpc/router";
+
+type RouterOutput = inferRouterOutputs<AppRouter>;
+
+type SessionResponse = RouterOutput["auth"]["session"];
+type Transaction = RouterOutput["transactions"]["list"]["items"][number];
+type Summary = RouterOutput["insights"]["summary"];
+
 type SortKey = "id" | "amount" | "type" | "createdAt";
 type SortDir = "asc" | "desc";
 

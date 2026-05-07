@@ -11,9 +11,8 @@
     "types": ["@cloudflare/workers-types", "vite/client", "bun-types"],
     "forceConsistentCasingInFileNames": true,
     "rootDir": ".",
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     },
     "outDir": "dist",
     "noUnusedLocals": false,

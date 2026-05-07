@@ -1,5 +1,3 @@
-import { TokenSessionManager } from "../services/auth/token-manager";
-
 export const createUserConfigStore = (db: D1Database) => {
   return {
     async getGroqApiKey(userId: number): Promise<string | null> {
@@ -35,12 +33,6 @@ export const createUserConfigStore = (db: D1Database) => {
         )
         .bind(userId)
         .run();
-    },
-
-    async generateOtp(chatId: number, secret: string) {
-      const manager = new TokenSessionManager(secret);
-      const { otp } = await manager.issueOtpChallenge(chatId);
-      return otp;
     },
   };
 };

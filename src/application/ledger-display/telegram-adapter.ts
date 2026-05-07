@@ -1,5 +1,5 @@
 import { Api } from "grammy";
-import type { LedgerDisplay } from "./interface";
+import type { LedgerDisplay } from "../../ports/ledger-display";
 import { createBalanceService } from "../../bot/balance";
 
 export class TelegramLedgerAdapter implements LedgerDisplay {

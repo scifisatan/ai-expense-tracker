@@ -5,13 +5,15 @@ import { trpc } from "./trpc";
 
 export const App = () => {
   const { data: session, isLoading, refetch } = trpc.auth.session.useQuery();
+  const logoutMutation = trpc.auth.logout.useMutation();
 
   const handleLogin = async () => {
     await refetch();
   };
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await logoutMutation.mutateAsync();
+    document.cookie = "budget_session=; path=/; max-age=0; SameSite=Lax";
     await refetch();
   };
 
@@ -22,4 +24,3 @@ export const App = () => {
 };
 
 export default App;
-

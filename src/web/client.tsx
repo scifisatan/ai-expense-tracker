@@ -21,4 +21,3 @@ createRoot(domNode).render(
     </QueryClientProvider>
   </trpc.Provider>,
 );
-

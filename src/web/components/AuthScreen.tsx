@@ -57,7 +57,8 @@ const AuthScreen = ({ onLogin }: { onLogin: () => void }) => {
       if (data.sessionToken) {
         // Set cookie manually if not done by server
         // If we are on localhost, Secure might cause issues if not on HTTPS
-        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const isLocalhost =
+          window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
         const secure = isLocalhost ? "" : " Secure;";
         document.cookie = `budget_session=${data.sessionToken}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax;${secure}`;
       }

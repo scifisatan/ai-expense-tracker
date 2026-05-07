@@ -1,6 +1,6 @@
-import type { SessionManager, SessionPayload, OtpChallengePayload } from "./interface";
+import type { AuthSession, SessionPayload, OtpChallengePayload } from "../../ports/auth-session";
 
-export class TokenSessionManager implements SessionManager {
+export class TokenSessionManager implements AuthSession {
   constructor(private secret: string) {}
 
   private base64UrlEncode(value: string) {
