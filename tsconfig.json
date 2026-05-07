@@ -8,11 +8,15 @@
     "lib": ["ESNext", "DOM"],
     "jsx": "react-jsx",
     "jsxImportSource": "react",
-    "types": ["@cloudflare/workers-types", "vite/client", "bun-types"],
+    "types": ["@cloudflare/workers-types", "vite/client"],
     "forceConsistentCasingInFileNames": true,
     "rootDir": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@apps/*": ["./src/apps/*"],
+      "@web/*" : ["./src/apps/web/*"],
+      "@bot/*" : ["./src/apps/bot/*"],
+      "@api/*" : ["./src/apps/api/*"],
     },
     "outDir": "dist",
     "noUnusedLocals": false,
