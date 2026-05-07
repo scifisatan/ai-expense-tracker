@@ -18,6 +18,10 @@ export const createTransactionManager = (config: TransactionManagerConfig) => {
   const normalizeType = (type: string) => (type === "Income" ? "Income" : "Expense");
 
   return {
+    async refreshPinnedBalance(chatId: number) {
+      return ledger.refreshBalance(chatId);
+    },
+    
     /**
      * The primary entry point for the Bot.
      * Extracts transactions from text, saves them, and updates balance.

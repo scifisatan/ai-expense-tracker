@@ -11,7 +11,7 @@ import type { AppEnv } from "@/apps/env";
 
 const web = new Hono<AppEnv>();
 
-web.get("/app", (c) => {
+web.get("/", (c) => {
   return c.html(
     <html>
       <head>
@@ -24,9 +24,9 @@ web.get("/app", (c) => {
         <title>Budget Bot</title>
 
         <ViteClient />
-        <Script src="/src/web/client.tsx" />
+        <Script src="/src/apps/web/client.tsx" />
         <Link
-          href="/src/web/styles.css"
+          href="/src/apps/web/styles.css"
           rel="stylesheet"
         />
       </head>

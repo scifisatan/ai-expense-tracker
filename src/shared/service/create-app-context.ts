@@ -4,7 +4,7 @@ import { createTelegramOtpMessenger } from "./auth-otp-messenger";
 import { createTransactionManager } from "./transaction-manager";
 import { TokenSessionManager } from "./token-manager";
 import { createAuthModule } from "./auth-module";
-import { createLedgerModule } from "./ledger-module";
+import { createLedgerModule, TelegramLedgerAdapter } from "./ledger-module";
 import { createUserConfigStore } from "./user-config";
 import { createUserStore } from "./user-store";
 
@@ -17,10 +17,11 @@ type AppRuntimeEnv = {
 
 export const createAppContext = (config: { db: D1Database; env: AppRuntimeEnv }) => {
   const { db, env } = config;
-  const token = env.BOT_TOKEN;
+  const token = env.BOT_TOKEN ?? "";
 
   const ledger = createLedgerModule({
     repo: createD1LedgerRepo(db),
+    display: new TelegramLedgerAdapter(token)
   });
 
   const userStore = createUserStore(db);

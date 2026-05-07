@@ -89,7 +89,9 @@ export const registerHandlers = (bot: Bot<BotContext>) => {
   };
 
   const sendBalance = async (ctx: BotContext, chatId: number) => {
+    if (!ctx.chat) return;
     const { ledger } = getServices(ctx);
+    await ledger.refreshBalance(ctx.chat.id);
   };
 
   const sendRecentTransactions = async (ctx: BotContext, chatId: number) => {
@@ -115,179 +117,180 @@ export const registerHandlers = (bot: Bot<BotContext>) => {
     });
   };
 
-  bot.command("start", async (ctx) => {
+  bot.command('start', async (ctx) => {
     const chatId = ctx.chat.id;
     const user = ctx.from;
     if (!user) return;
 
     try {
-      const { ledger, userConfigStore, userStore } = getServices(ctx);
-
+      const { transactionManager, userConfigStore, userStore } = getServices(ctx);
+      
       await userStore.ensureUser({
         id: user.id,
         username: user.username,
         first_name: user.first_name,
-        last_name: user.last_name,
+        last_name: user.last_name
       });
 
+      const currentBalance = await transactionManager.refreshPinnedBalance(chatId);
       const existingKey = await userConfigStore.getGroqApiKey(user.id);
 
       await ctx.reply(
-        `✅ Budget tracking is active.\n\n🌐 Web app: open the deployed domain, enter chat ID \`${chatId}\`, and use /app to get your OTP.`,
+        `✅ Budget tracking is active. I pinned the current balance at Rs. ${currentBalance}.\n\n🌐 Web app: open the deployed domain, enter chat ID \`${chatId}\`, and use /app to get your OTP.`,
         {
-          parse_mode: "Markdown",
+          parse_mode: 'Markdown',
           reply_markup: getChatKeyboard(),
-        },
+        }
       );
 
       if (!existingKey) {
-        await ctx.reply(getMissingKeyWarning(), { parse_mode: "Markdown" });
+        await ctx.reply(getMissingKeyWarning(), { parse_mode: 'Markdown' });
       } else {
-        await ctx.reply("🔐 Groq API key is already set for your account.");
+        await ctx.reply('🔐 Groq API key is already set for your account.');
       }
     } catch (e) {
-      console.error("[start-balance-error]", e);
-      await ctx.reply("Failed to initialize. Please try /start again.");
+      console.error('[start-balance-error]', e);
+      await ctx.reply('Failed to initialize. Please try /start again.');
     }
   });
 
-  bot.command("app", async (ctx) => {
+  bot.command('app', async (ctx) => {
     const chatId = ctx.chat.id;
     const username = ctx.from?.username;
-    const webappUrl = ctx.env.WEBHOOK_URL ? ctx.env.WEBHOOK_URL.replace(/\/$/, "") : null;
-
+    const webappUrl = ctx.env.WEBHOOK_URL ? ctx.env.WEBHOOK_URL.replace(/\/$/, '') : null;
+    
     let message = `📱 *Web App Access*\n\n`;
-
+    
     if (username) {
       message += `Your Username: \`@${username}\`\n`;
     } else {
       message += `Your Chat ID: \`${chatId}\`\n`;
     }
-
-    message += "\n";
+    
+    message += '\n';
 
     if (webappUrl) {
       message += `🔗 [Open Dashboard](${webappUrl}/app)\n\n`;
     }
+    
+    message += `1️⃣ Open the dashboard\n2️⃣ Enter your ${username ? 'Username' : 'Chat ID'}\n3️⃣ Click "Request OTP"\n4️⃣ I will send you a login code here!`;
 
-    message += `1️⃣ Open the dashboard\n2️⃣ Enter your ${username ? "Username" : "Chat ID"}\n3️⃣ Click "Request OTP"\n4️⃣ I will send you a login code here!`;
-
-    await ctx.reply(message, {
-      parse_mode: "Markdown",
-      link_preview_options: { is_disabled: true },
+    await ctx.reply(message, { 
+      parse_mode: 'Markdown',
+      link_preview_options: { is_disabled: true }
     });
   });
 
-  bot.command("setkey", async (ctx) => {
+  bot.command('setkey', async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;
 
     const apiKey = ctx.match?.trim();
 
     if (!apiKey) {
-      await ctx.reply("Usage: /setkey <your_groq_api_key>");
+      await ctx.reply('Usage: /setkey <your_groq_api_key>');
       return;
     }
 
     const { userConfigStore } = getServices(ctx);
     await userConfigStore.setGroqApiKey(userId, apiKey);
-    await ctx.reply("✅ Your Groq API key has been saved.");
+    await ctx.reply('✅ Your Groq API key has been saved.');
   });
 
-  bot.command("removekey", async (ctx) => {
+  bot.command('removekey', async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;
 
     const { userConfigStore } = getServices(ctx);
     await userConfigStore.removeGroqApiKey(userId);
-    await ctx.reply("🗑️ Your Groq API key has been removed.");
+    await ctx.reply('🗑️ Your Groq API key has been removed.');
   });
 
-  bot.command("keystatus", async (ctx) => {
+  bot.command('keystatus', async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId) return;
 
     const { userConfigStore } = getServices(ctx);
     const key = await userConfigStore.getGroqApiKey(userId);
-    await ctx.reply(key ? "✅ Groq API key is set." : "❌ Groq API key is not set.");
+    await ctx.reply(key ? '✅ Groq API key is set.' : '❌ Groq API key is not set.');
   });
 
-  bot.command("clear", async (ctx) => {
+  bot.command('clear', async (ctx) => {
     const chatId = ctx.chat.id;
     const lastMessageId = ctx.message?.message_id;
 
     if (!lastMessageId) return;
 
-    const feedback = await ctx.reply("🧹 *Cleaning up chat (deep sweep)...*", {
-      parse_mode: "Markdown",
-    });
+    const feedback = await ctx.reply('🧹 *Cleaning up chat (deep sweep)...*', { parse_mode: 'Markdown' });
 
     // Deep sweep: Check the last 500 potential message IDs.
     // In low-traffic bots, message IDs can have large gaps.
     const range = 500;
     const messageIds = Array.from({ length: range }, (_, i) => lastMessageId - i);
-
+    
     const batchSize = 100;
     for (let i = 0; i < messageIds.length; i += batchSize) {
       const chunk = messageIds.slice(i, i + batchSize);
       // Run each batch in parallel
-      await Promise.all(chunk.map((id) => ctx.api.deleteMessage(chatId, id).catch(() => {})));
+      await Promise.all(
+        chunk.map(id => ctx.api.deleteMessage(chatId, id).catch(() => {}))
+      );
     }
-
+    
     // Also try to delete the "cleaning up" message
     await ctx.api.deleteMessage(chatId, feedback.message_id).catch(() => {});
 
-    await ctx.reply("✨ *Chat cleaned.*", {
-      parse_mode: "Markdown",
-      reply_markup: getChatKeyboard(),
+    await ctx.reply('✨ *Chat cleaned.*', {
+      parse_mode: 'Markdown',
+      reply_markup: getChatKeyboard()
     });
   });
 
-  bot.command("help", async (ctx) => sendHelp(ctx, ctx.chat.id));
-  bot.command("menu", async (ctx) => {
-    await ctx.reply("Quick actions:", { reply_markup: getMainMenu() });
-    await ctx.reply("Keyboard enabled ⌨️", { reply_markup: getChatKeyboard() });
+  bot.command('help', async (ctx) => sendHelp(ctx, ctx.chat.id));
+  bot.command('menu', async (ctx) => {
+    await ctx.reply('Quick actions:', { reply_markup: getMainMenu() });
+    await ctx.reply('Keyboard enabled ⌨️', { reply_markup: getChatKeyboard() });
   });
-  bot.command("balance", async (ctx) => sendBalance(ctx, ctx.chat.id));
-  bot.command("transactions", async (ctx) => sendRecentTransactions(ctx, ctx.chat.id));
+  bot.command('balance', async (ctx) => sendBalance(ctx, ctx.chat.id));
+  bot.command('transactions', async (ctx) => sendRecentTransactions(ctx, ctx.chat.id));
 
   bot.hears(/^💰\s*Balance$/i, async (ctx) => sendBalance(ctx, ctx.chat.id));
   bot.hears(/^📒\s*Transactions$/i, async (ctx) => sendRecentTransactions(ctx, ctx.chat.id));
   bot.hears(/^ℹ️\s*Help$/i, async (ctx) => sendHelp(ctx, ctx.chat.id));
 
-  bot.on("callback_query:data", async (ctx) => {
+  bot.on('callback_query:data', async (ctx) => {
     const data = ctx.callbackQuery.data;
     const chatId = ctx.callbackQuery.message?.chat.id;
 
     if (!data || !chatId) return;
 
-    if (data === "ui:help") {
+    if (data === 'ui:help') {
       await ctx.answerCallbackQuery();
       await sendHelp(ctx, chatId);
       return;
     }
 
-    if (data === "ui:balance") {
+    if (data === 'ui:balance') {
       await ctx.answerCallbackQuery();
       await sendBalance(ctx, chatId);
       return;
     }
 
-    if (data === "ui:transactions") {
+    if (data === 'ui:transactions') {
       await ctx.answerCallbackQuery();
       await sendRecentTransactions(ctx, chatId);
       return;
     }
   });
 
-  bot.on("message:text", async (ctx) => {
+  bot.on('message:text', async (ctx) => {
     const chatId = ctx.chat.id;
     const userId = ctx.from?.id;
     if (!userId) return;
 
     const text = ctx.message.text.trim();
 
-    if (!text || text.startsWith("/")) return;
+    if (!text || text.startsWith('/')) return;
     if (
       /^💰\s*Balance$/i.test(text) ||
       /^📒\s*Transactions$/i.test(text) ||
@@ -301,17 +304,12 @@ export const registerHandlers = (bot: Bot<BotContext>) => {
       const userGroqToken = await requireUserGroqKey(ctx, userId);
       if (!userGroqToken) return;
 
-      const processingMsg = await ctx.reply("⏳ _Processing your message..._", {
-        parse_mode: "Markdown",
+      const processingMsg = await ctx.reply('⏳ _Processing your message..._', {
+        parse_mode: 'Markdown',
       });
 
-      await ctx.api.sendChatAction(chatId, "typing");
-      const result = await transactionManager.processUserMessage(
-        chatId,
-        userId,
-        text,
-        userGroqToken,
-      );
+      await ctx.api.sendChatAction(chatId, 'typing');
+      const result = await transactionManager.processUserMessage(chatId, userId, text, userGroqToken);
 
       if (!result) {
         await ctx.api.deleteMessage(chatId, processingMsg.message_id).catch(() => {});
@@ -323,21 +321,18 @@ export const registerHandlers = (bot: Bot<BotContext>) => {
         processingMsg.message_id,
         [
           `✅ Recorded ${result.items.length} transaction(s)`,
-          ...result.items.map(
-            (item) =>
-              `• ${item.type === "Expense" ? "-" : "+"}${formatMoney(item.amount)}${item.note ? ` (${item.note})` : ""}`,
-          ),
-          `\nNet change: ${result.net >= 0 ? "+" : ""}${formatMoney(result.net)}`,
-          `New balance: ${formatMoney(result.newBalance)}`,
-        ].join("\n"),
+          ...result.items.map(item => `• ${item.type === 'Expense' ? '-' : '+'}${formatMoney(item.amount)}${item.note ? ` (${item.note})` : ''}`),
+          `\nNet change: ${result.net >= 0 ? '+' : ''}${formatMoney(result.net)}`,
+          `New balance: ${formatMoney(result.newBalance)}`
+        ].join('\n')
       );
 
       // Reply keyboard cannot be attached via editMessageText, so we send a separate message
-      // or just rely on the existing persistent keyboard.
+      // or just rely on the existing persistent keyboard. 
       // Since the user just sent a message, the keyboard is likely already visible.
     } catch (err: any) {
-      log.error("[extract-error]", err);
-      await ctx.reply("Failed to process message. Check your Groq API key and try again.");
+      log.error('[extract-error]', err);
+      await ctx.reply('Failed to process message. Check your Groq API key and try again.');
     }
   });
 };

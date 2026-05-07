@@ -1,3 +1,4 @@
+import { createBalanceService } from "@/apps/bot/balance";
 import { type LedgerRepo } from "@/shared/service/ledger-repo";
 import type {
   BalanceProjection,
@@ -5,6 +6,28 @@ import type {
   LedgerTransactionPatch,
   NewLedgerTransaction,
 } from "@/shared/types/ledger";
+import { Api } from "grammy";
+
+export interface LedgerDisplay {
+  updateBalance(chatId: number, balance: number): Promise<void>;
+}
+
+export class TelegramLedgerAdapter implements LedgerDisplay {
+  private balanceService: ReturnType<typeof createBalanceService>;
+
+  constructor(botToken: string) {
+    const api = new Api(botToken);
+    this.balanceService = createBalanceService(api);
+  }
+
+  async updateBalance(chatId: number, balance: number): Promise<void> {
+    // The adapter handles the domain-specific formatting (emojis, currency symbols)
+    // and the technical implementation (Telegram pinning/editing logic)
+    await this.balanceService.sendAndPinBalance(chatId, balance);
+  }
+}
+
+
 
 export interface LedgerModule {
   listRecent(chatId: number, limit?: number): Promise<LedgerTransaction[]>;
@@ -21,13 +44,19 @@ export interface LedgerModule {
     patch: LedgerTransactionPatch,
   ): Promise<{ newBalance: number }>;
   deleteTransactions(chatId: number, ids: number[]): Promise<{ newBalance: number }>;
+  refreshBalance(chatId: number): Promise<number>;
 }
 
 export interface LedgerModuleConfig {
   repo: LedgerRepo;
+  display?: LedgerDisplay;
 }
 
 export const createLedgerModule = (config: LedgerModuleConfig): LedgerModule => {
+ const syncDisplay = async (chatId: number, balance: number) => {
+    if (!config.display) return;
+    await config.display.updateBalance(chatId, balance);
+  };
 
   return {
     async listRecent(chatId: number, limit = 10) {
@@ -46,6 +75,7 @@ export const createLedgerModule = (config: LedgerModuleConfig): LedgerModule => 
 
       await config.repo.addMany(chatId, userId, items, fallbackNote);
       const summary = await config.repo.getSummary(chatId);
+        await syncDisplay(chatId, summary.net);
       return { newBalance: summary.net };
     },
 
@@ -61,6 +91,7 @@ export const createLedgerModule = (config: LedgerModuleConfig): LedgerModule => 
 
       await config.repo.updateById(chatId, id, nextPatch);
       const summary = await config.repo.getSummary(chatId);
+        await syncDisplay(chatId, summary.net);
       return { newBalance: summary.net };
     },
 
@@ -70,7 +101,18 @@ export const createLedgerModule = (config: LedgerModuleConfig): LedgerModule => 
       }
 
       const summary = await config.repo.getSummary(chatId);
+        await syncDisplay(chatId, summary.net);
       return { newBalance: summary.net };
-    }
+    },
+
+    async refreshBalance(chatId: number) {
+      if (!config.display) {
+        throw new Error("LEDGER_DISPLAY_NOT_CONFIGURED");
+      }
+
+      const summary = await config.repo.getSummary(chatId);
+      await config.display.updateBalance(chatId, summary.net);
+      return summary.net;
+    },
   };
 };

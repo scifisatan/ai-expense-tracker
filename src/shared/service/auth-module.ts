@@ -18,7 +18,7 @@ export const createAuthModule = (config: AuthModuleConfig): AuthModule => {
     if (input.chatId) {
        return input.chatId 
       } else {
-        throw new Error("CHAT_ID_MISSING")
+        throw new Error("Invalid Chat ID")
       }
   };
 

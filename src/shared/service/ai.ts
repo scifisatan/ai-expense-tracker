@@ -1,22 +1,8 @@
 import { createGroq } from "@ai-sdk/groq";
 import { generateText } from "ai";
-import { z } from "zod";
-import { log } from "../../utils/logger";
+import { log } from "@/utils/logger";
+import { TransactionsExtraction, transactionsSchema } from "@/shared/types/ledger";
 
-const transactionItemSchema = z.object({
-  amount: z.number().int().describe("Transaction amount as positive integer"),
-  type: z.enum(["Expense", "Income"]).describe("Money flow direction"),
-  note: z.string().describe("Note related to the transaction"),
-});
-
-const transactionsSchema = z.object({
-  items: z
-    .array(transactionItemSchema)
-    .describe("List of all transactions mentioned; empty if none"),
-});
-
-export type TransactionItem = z.infer<typeof transactionItemSchema>;
-export type TransactionsExtraction = z.infer<typeof transactionsSchema>;
 
 export const createAIService = (options: { model: string }) => {
   return {

@@ -27,8 +27,13 @@ const handleUpdate = async (c: AppContext) => {
       }
 
     const bot = new Bot<BotContext>(token);
+    
+    bot.use(async (ctx, next) => {
+      ctx.env = c.env;
+      await next();
+    });
 
-      registerHandlers(bot);
+    registerHandlers(bot);
 
     await bot.init();
     await bot.handleUpdate(update);

@@ -47,3 +47,18 @@ export type LedgerTransactionPatch = {
   type?: TransactionType;
   note?: string | null;
 };
+
+export const transactionItemSchema = z.object({
+  amount: z.number().int().describe("Transaction amount as positive integer"),
+  type: z.enum(["Expense", "Income"]).describe("Money flow direction"),
+  note: z.string().describe("Note related to the transaction"),
+});
+
+export const transactionsSchema = z.object({
+  items: z
+    .array(transactionItemSchema)
+    .describe("List of all transactions mentioned; empty if none"),
+});
+
+export type TransactionItem = z.infer<typeof transactionItemSchema>;
+export type TransactionsExtraction = z.infer<typeof transactionsSchema>;

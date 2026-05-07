@@ -1,11 +1,11 @@
 import { initTRPC, TRPCError } from "@trpc/server";
-import { createAppContext } from "../../shared/service/create-app-context";
-import { requestOtpInputSchema, verifyOtpInputSchema } from "../../shared/types/auth";
+import { createAppContext } from "@/shared/service/create-app-context";
+import { requestOtpInputSchema, verifyOtpInputSchema } from "@/shared/types/auth";
 import {
   transactionsDeleteInputSchema,
   transactionsListInputSchema,
   transactionsUpdateInputSchema,
-} from "../../shared/types/ledger";
+} from "@/shared/types/ledger";
 
 export const t = initTRPC.context<{ chatId: number | null; db: D1Database; env: any }>().create();
 
@@ -103,7 +103,8 @@ export const router = t.router({
           type: input.type,
           note: input.note,
         });
-
+        
+        await ledger.refreshBalance(ctx.chatId)
         return { ok: true, newBalance: result.newBalance };
       } catch (error) {
         if (error instanceof Error && error.message === "TRANSACTION_NOT_FOUND") {
@@ -118,6 +119,7 @@ export const router = t.router({
 
       const ledger = getAppContext(ctx.db, ctx.env).ledger;
       const result = await ledger.deleteTransactions(ctx.chatId, input.ids);
+      await ledger.refreshBalance(ctx.chatId)
       return { ok: true, newBalance: result.newBalance };
     }),
   },
