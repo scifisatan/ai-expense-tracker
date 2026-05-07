@@ -17,3 +17,4 @@
 
 - **D1 Ledger Store**: storage for Transaction Entry rows.
 - **D1 User Store**: storage for user identity and Groq key settings.
+
