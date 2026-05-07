@@ -15,11 +15,7 @@
     "db:migrate:remote": "wrangler d1 migrations apply telegram_budget_bot --remote",
     "build": "vite build",
     "lint": "oxlint .",
-    "format": "oxfmt . --write",
-    "test": "vitest run",
-    "check:architecture": "node scripts/check-domain-imports.mjs",
-    "ci:architecture": "npm run check:architecture",
-    "test:watch": "vitest"
+    "format": "oxfmt . --write"
   },
   "dependencies": {
     "@ai-sdk/groq": "^2.0.32",

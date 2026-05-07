@@ -1,60 +1,56 @@
+import { createAiService } from "@/shared/service/ai-service"
+import { createTelegramAuthService } from "@/shared/service/auth-service"
+import { createDatabaseService } from "@/shared/service/database-service"
+import { createLedgerService, type LedgerBalancePublisher } from "@/shared/service/ledger-service"
+import { createTelegramBotService } from "@/shared/service/telegram-bot-service"
 
-import { createD1LedgerRepo } from "./ledger-repo";
-import { createTelegramOtpMessenger } from "./auth-otp-messenger";
-import { createTransactionManager } from "./transaction-manager";
-import { TokenSessionManager } from "./token-manager";
-import { createAuthModule } from "./auth-module";
-import { createLedgerModule, TelegramLedgerAdapter } from "./ledger-module";
-import { createUserConfigStore } from "./user-config";
-import { createUserStore } from "./user-store";
-
-const DEFAULT_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+const DEFAULT_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 type AppRuntimeEnv = {
-  BOT_TOKEN?: string;
-  AI_MODEL?: string;
-};
+  AI_MODEL?: string
+  BOT_TOKEN?: string
+}
 
-export const createAppContext = (config: { db: D1Database; env: AppRuntimeEnv }) => {
-  const { db, env } = config;
-  const token = env.BOT_TOKEN ?? "";
+type AppContextConfig = {
+  db: D1Database
+  env: AppRuntimeEnv
+  telegram?: {
+    balancePublisher?: LedgerBalancePublisher
+    botToken?: string
+  }
+}
 
-  const ledger = createLedgerModule({
-    repo: createD1LedgerRepo(db),
-    display: new TelegramLedgerAdapter(token)
-  });
+export const createAppContext = (config: AppContextConfig) => {
+  const { db, env, telegram } = config
+  const botToken = telegram?.botToken ?? env.BOT_TOKEN
+  const authSecret = env.BOT_TOKEN ?? botToken ?? ""
+  const database = createDatabaseService(db)
+  const ai = createAiService({ model: env.AI_MODEL ?? DEFAULT_MODEL })
 
-  const userStore = createUserStore(db);
-  const userConfigStore = createUserConfigStore(db);
+  const ledger = createLedgerService({
+    balancePublisher: telegram?.balancePublisher,
+    ledgerRepository: database.ledger
+  })
 
-  const transactionManager = createTransactionManager({
-        aiModel: env.AI_MODEL ?? DEFAULT_MODEL,
-        ledger,
-      })
+  const telegramBot = createTelegramBotService({
+    ai,
+    ledger,
+    userSettings: database.userSettings,
+    users: database.users
+  })
 
-  const createSessionAuthModule = () => {
-    if (!token) throw new Error("Missing auth secret");
-
-    return createAuthModule({
-      session: new TokenSessionManager(token),
-    });
-  };
-
-  const createOtpAuthModule = () => {
-    if (!token) throw new Error("Missing bot token");
-
-    return createAuthModule({
-      otpMessenger: createTelegramOtpMessenger(token),
-      session: new TokenSessionManager(token),
-    });
-  };
+  const createOtpAuth = () => {
+    return createTelegramAuthService({
+      botToken,
+      authSecret
+    })
+  }
 
   return {
     ledger,
-    userStore,
-    userConfigStore,
-    transactionManager,
-    createSessionAuthModule,
-    createOtpAuthModule,
-  };
-};
+    telegramBot,
+    createOtpAuth
+  }
+}
+
+export type AppContext = ReturnType<typeof createAppContext>

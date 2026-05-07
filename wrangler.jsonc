@@ -4,20 +4,20 @@
   "main": "src/index.tsx",
   "compatibility_date": "2026-05-06",
   "observability": {
-    "enabled": true,
+    "enabled": true
   },
   "d1_databases": [
     {
       "database_name": "telegram_budget_bot",
       "binding": "DB",
-      "database_id": "aafc7c03-08cd-47ab-a5cf-1185176d569c",
-    },
+      "database_id": "aafc7c03-08cd-47ab-a5cf-1185176d569c"
+    }
   ],
   "vars": {
-    "AI_MODEL": "meta-llama/llama-4-scout-17b-16e-instruct",
+    "AI_MODEL": "meta-llama/llama-4-scout-17b-16e-instruct"
   },
   "assets": {
     "directory": "./dist/client",
-    "binding": "ASSETS",
-  },
+    "binding": "ASSETS"
+  }
 }

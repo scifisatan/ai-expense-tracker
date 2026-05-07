@@ -7,14 +7,6 @@ Telegram budget tracker running on **Cloudflare Workers** using:
 - **D1** for per-user config (Groq API key) and per-chat transaction history
 - **Groq** for transaction extraction
 
-## Notes
-
-- No Durable Objects
-- No model picker
-- Per-user Groq API key is required for message processing
-
-The bot uses a single model from `AI_MODEL` (or default fallback).
-
 ## Required bindings / vars
 
 Configure in `wrangler.jsonc` / `wrangler secret`:
@@ -23,7 +15,6 @@ Configure in `wrangler.jsonc` / `wrangler secret`:
 - `DB` (D1 binding)
 - `AI_MODEL` (optional, has default)
 - `WEBHOOK_URL` (optional; if set, bot auto-calls Telegram `setWebhook` to `${WEBHOOK_URL}/webhook` on first request)
-- `WEBAPP_AUTH_SECRET` (recommended, used to sign OTP/session tokens for `/app` web login)
 
 ## D1 setup
 
@@ -59,11 +50,16 @@ Schema is managed explicitly via SQL files in `migrations/`.
 
 ```bash
 npm install
-npm run web:build
 npm run dev
 ```
 
 Web app is served from `/app` and uses OTP login sent to Telegram.
+
+For a production build:
+
+```bash
+npm run build
+```
 
 ## Deploy
 

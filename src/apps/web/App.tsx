@@ -1,25 +1,16 @@
-import Dashboard from "./components/Dashboard";
-import AuthScreen from "./components/AuthScreen";
-import { trpc } from "./trpc";
+import { useAuth } from "@web/hooks/useAuth"
+
+import Dashboard from "@web/components/Dashboard"
+import AuthScreen from "@web/components/AuthScreen"
 
 export const App = () => {
-  const { data: session, isLoading, refetch } = trpc.auth.session.useQuery();
-  const logoutMutation = trpc.auth.logout.useMutation();
+  const { session, isLoading, handleLogin, handleLogout } = useAuth()
 
-  const handleLogin = async () => {
-    await refetch();
-  };
+  if (isLoading) return <div className="p-8 text-center text-gray-500">Loading...</div>
 
-  const handleLogout = async () => {
-    await logoutMutation.mutateAsync();
-    document.cookie = "budget_session=; path=/; max-age=0; SameSite=Lax";
-    await refetch();
-  };
+  if (!session?.authenticated) return <AuthScreen onLogin={handleLogin} />
 
-  if (isLoading) return <div className="p-8 text-center text-gray-500">Loading...</div>;
+  return <Dashboard chatId={session.chatId} onLogout={handleLogout} />
+}
 
-  if (!session?.authenticated) return <AuthScreen onLogin={handleLogin} />;
-  return <Dashboard chatId={session.chatId} onLogout={handleLogout} />;
-};
-
-export default App;
+export default App

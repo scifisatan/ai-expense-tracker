@@ -1,0 +1,5 @@
+{
+  "$schema": "https://oxc.rs/schema/oxfmt.json",
+  "semi": false,
+  "trailingComma": "none"
+}

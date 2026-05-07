@@ -1,14 +1,14 @@
-import type { Context } from "hono";
+import type { Context } from "hono"
 
 export type CloudflareBindings = {
-  BOT_TOKEN?: string;
-  AI_MODEL?: string;
-  WEBHOOK_URL?: string;
-  DB: D1Database;
-};
+  BOT_TOKEN?: string
+  AI_MODEL?: string
+  WEBHOOK_URL?: string
+  DB: D1Database
+}
 
 export type AppEnv = {
-  Bindings: CloudflareBindings;
-};
+  Bindings: CloudflareBindings
+}
 
-export type AppContext = Context<AppEnv>;
+export type AppContext = Context<AppEnv>

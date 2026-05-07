@@ -14,13 +14,11 @@
     "paths": {
       "@/*": ["./src/*"],
       "@apps/*": ["./src/apps/*"],
-      "@web/*" : ["./src/apps/web/*"],
-      "@bot/*" : ["./src/apps/bot/*"],
-      "@api/*" : ["./src/apps/api/*"],
+      "@web/*": ["./src/apps/web/*"],
+      "@bot/*": ["./src/apps/bot/*"],
+      "@api/*": ["./src/apps/api/*"]
     },
-    "outDir": "dist",
-    "noUnusedLocals": false,
-    "noUnusedParameters": false
+    "outDir": "dist"
   },
   "include": ["src/**/*", "test/**/*"],
   "exclude": ["node_modules", "dist"]

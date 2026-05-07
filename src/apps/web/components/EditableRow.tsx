@@ -1,45 +1,45 @@
-import { useState, useMemo } from "react";
-import { money } from "../helper";
-import { Transaction } from "@web/types";
-import { TransactionType } from "@/shared/types/ledger";
+import { useState, useMemo } from "react"
+import { money } from "../helper"
+import { Transaction } from "@web/types"
+import { TransactionType } from "@/shared/types/ledger"
 
 const EditableRow = ({
   tx,
   selected,
   onSelect,
   onSave,
-  onDelete,
+  onDelete
 }: {
-  tx: Transaction;
-  selected: boolean;
-  onSelect: (checked: boolean) => void;
-  onSave: (patch: Partial<Transaction>) => Promise<void>;
-  onDelete: () => Promise<void>;
+  tx: Transaction
+  selected: boolean
+  onSelect: (checked: boolean) => void
+  onSave: (patch: Partial<Transaction>) => Promise<void>
+  onDelete: () => Promise<void>
 }) => {
-  const [editing, setEditing] = useState(false);
-  const [type, setType] = useState(tx.type);
-  const [amount, setAmount] = useState(tx.amount.toString());
-  const [note, setNote] = useState(tx.note ?? "");
-  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false)
+  const [type, setType] = useState(tx.type)
+  const [amount, setAmount] = useState(tx.amount.toString())
+  const [note, setNote] = useState(tx.note ?? "")
+  const [saving, setSaving] = useState(false)
 
   const save = async () => {
-    setSaving(true);
-    await onSave({ type, amount: Number(amount), note });
-    setSaving(false);
-    setEditing(false);
-  };
+    setSaving(true)
+    await onSave({ type, amount: Number(amount), note })
+    setSaving(false)
+    setEditing(false)
+  }
 
   const dateStr = useMemo(() => {
     try {
       return new Date(tx.createdAt).toLocaleDateString("en-IN", {
         day: "2-digit",
         month: "short",
-        year: "2-digit",
-      });
+        year: "2-digit"
+      })
     } catch {
-      return tx.createdAt;
+      return tx.createdAt
     }
-  }, [tx.createdAt]);
+  }, [tx.createdAt])
 
   if (!editing) {
     return (
@@ -70,14 +70,14 @@ const EditableRow = ({
           <button
             className="btn-delete"
             onClick={() => {
-              if (confirm("Delete this transaction?")) onDelete();
+              if (confirm("Delete this transaction?")) onDelete()
             }}
           >
             Delete
           </button>
         </td>
       </tr>
-    );
+    )
   }
 
   return (
@@ -85,7 +85,11 @@ const EditableRow = ({
       <td className="checkbox-cell"></td>
       <td className="td-id">#{tx.id}</td>
       <td>
-        <select className="inline-select" value={type} onChange={(e) => setType(e.target.value as TransactionType)}>
+        <select
+          className="inline-select"
+          value={type}
+          onChange={(e) => setType(e.target.value as TransactionType)}
+        >
           <option value="Income">Income</option>
           <option value="Expense">Expense</option>
         </select>
@@ -114,17 +118,17 @@ const EditableRow = ({
         <button
           className="btn-cancel"
           onClick={() => {
-            setEditing(false);
-            setType(tx.type);
-            setAmount(tx.amount.toString());
-            setNote(tx.note ?? "");
+            setEditing(false)
+            setType(tx.type)
+            setAmount(tx.amount.toString())
+            setNote(tx.note ?? "")
           }}
         >
           ✕
         </button>
       </td>
     </tr>
-  );
-};
+  )
+}
 
-export default EditableRow;
+export default EditableRow

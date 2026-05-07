@@ -1,128 +1,43 @@
-import { useState, useCallback, useMemo } from "react";
-import { money, pct } from "../helper";
-import { type SortKey, type SortDir, type Transaction } from "@web/types";
-import EditableRow from "./EditableRow";
-import { trpc } from "@web/trpc";
+import { useMemo } from "react"
+import { money, pct } from "../helper"
+import { type SortKey } from "@web/types"
+import EditableRow from "./EditableRow"
+import { useTransaction } from "../hooks/useTransaction"
+import { useTransactionFilter } from "../hooks/useTransactionFilter"
+import { useTransactionSelection } from "../hooks/useTransactionSelection"
 
 const Dashboard = ({ chatId, onLogout }: { chatId: number | null; onLogout: () => void }) => {
-  const {
-    data: txData,
-    isLoading: isTxLoading,
-    refetch: refetchTx,
-  } = trpc.transactions.list.useQuery({ limit: 200 });
-  const {
-    data: summary,
-    isLoading: isSumLoading,
-    refetch: refetchSum,
-  } = trpc.insights.summary.useQuery();
+  const { transactions, summary, isLoading, status, updateTransaction, deleteTransactions } =
+    useTransaction(() => clearSelection())
 
-  const transactions: Transaction[] = txData?.items ?? [];
+  const { search, setSearch, typeFilter, setTypeFilter, filtered, getSortThProps } =
+    useTransactionFilter(transactions)
 
-  const updateMutation = trpc.transactions.update.useMutation();
-  const deleteMutation = trpc.transactions.delete.useMutation();
+  const { selectedIds, allSelected, toggleSelect, toggleSelectAll, clearSelection } =
+    useTransactionSelection(filtered.map((t) => t.id))
 
-  const [status, setStatus] = useState("");
-  const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"All" | "Income" | "Expense">("All");
-  const [sortKey, setSortKey] = useState<SortKey>("id");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const incomeCount = useMemo(
+    () => transactions.filter((t) => t.type === "Income").length,
+    [transactions]
+  )
+  const expenseCount = useMemo(
+    () => transactions.filter((t) => t.type === "Expense").length,
+    [transactions]
+  )
 
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const avgTx = summary && summary.transactions > 0 ? summary.expense / summary.transactions : 0
 
-  const loadData = useCallback(async () => {
-    await Promise.all([refetchTx(), refetchSum()]);
-    setSelectedIds(new Set());
-  }, [refetchTx, refetchSum]);
+  const SortTh = ({ k, label }: { k: SortKey; label: string }) => {
+    const { active, dir, onToggle } = getSortThProps(k)
+    return (
+      <th onClick={onToggle} className={active ? "active-sort" : ""}>
+        {label}
+        <span className="sort-arrow">{active ? (dir === "asc" ? "↑" : "↓") : "↕"}</span>
+      </th>
+    )
+  }
 
-  const updateTransaction = async (tx: Transaction, patch: Partial<Transaction>) => {
-    try {
-      await updateMutation.mutateAsync({
-        id: tx.id,
-        amount: patch.amount,
-        type: patch.type,
-        note: patch.note === undefined ? undefined : patch.note,
-      });
-      setStatus("Saved ✓");
-      setTimeout(() => setStatus(""), 2500);
-      await loadData();
-    } catch (e) {
-      setStatus("Failed to update.");
-      setTimeout(() => setStatus(""), 3000);
-    }
-  };
-
-  const deleteTransactions = async (ids: number[]) => {
-    try {
-      await deleteMutation.mutateAsync({ ids });
-      setStatus(`Deleted ${ids.length} transaction(s) ✓`);
-      setTimeout(() => setStatus(""), 2500);
-      await loadData();
-    } catch (e) {
-      setStatus("Failed to delete.");
-      setTimeout(() => setStatus(""), 3000);
-    }
-  };
-
-  const toggleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedIds(new Set(filtered.map((t) => t.id)));
-    } else {
-      setSelectedIds(new Set());
-    }
-  };
-
-  const toggleSelect = (id: number, checked: boolean) => {
-    const next = new Set(selectedIds);
-    if (checked) next.add(id);
-    else next.delete(id);
-    setSelectedIds(next);
-  };
-
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else {
-      setSortKey(key);
-      setSortDir("desc");
-    }
-  };
-
-  const filtered = useMemo(() => {
-    let list = [...transactions];
-    if (typeFilter !== "All") list = list.filter((t) => t.type === typeFilter);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (t) =>
-          t.note?.toLowerCase().includes(q) ||
-          String(t.amount).includes(q) ||
-          String(t.id).includes(q),
-      );
-    }
-    list.sort((a, b) => {
-      let va: string | number = a[sortKey] ?? "";
-      let vb: string | number = b[sortKey] ?? "";
-      if (typeof va === "string") va = va.toLowerCase();
-      if (typeof vb === "string") vb = vb.toLowerCase();
-      if (va < vb) return sortDir === "asc" ? -1 : 1;
-      if (va > vb) return sortDir === "asc" ? 1 : -1;
-      return 0;
-    });
-    return list;
-  }, [transactions, typeFilter, search, sortKey, sortDir]);
-
-  const incomeCount = transactions.filter((t) => t.type === "Income").length;
-  const expenseCount = transactions.filter((t) => t.type === "Expense").length;
-  const avgTx = summary && summary.transactions > 0 ? summary.expense / summary.transactions : 0;
-
-  const SortTh = ({ k, label }: { k: SortKey; label: string }) => (
-    <th onClick={() => toggleSort(k)} className={sortKey === k ? "active-sort" : ""}>
-      {label}
-      <span className="sort-arrow">{sortKey === k ? (sortDir === "asc" ? "↑" : "↓") : "↕"}</span>
-    </th>
-  );
-
-  if (isTxLoading || isSumLoading)
-    return <div className="p-8 text-center text-gray-500">Loading Dashboard...</div>;
+  if (isLoading) return <div className="p-8 text-center text-gray-500">Loading Dashboard...</div>
 
   return (
     <div className="app-shell">
@@ -171,7 +86,7 @@ const Dashboard = ({ chatId, onLogout }: { chatId: number | null; onLogout: () =
                   className="metric-bar-fill"
                   style={{
                     width: `${Math.min(100, pct(Math.abs(summary.net), summary.income))}%`,
-                    background: summary.net >= 0 ? "var(--income)" : "var(--expense)",
+                    background: summary.net >= 0 ? "var(--income)" : "var(--expense)"
                   }}
                 />
               </div>
@@ -220,7 +135,7 @@ const Dashboard = ({ chatId, onLogout }: { chatId: number | null; onLogout: () =
                   className="btn-delete-bulk"
                   onClick={() => {
                     if (confirm(`Delete ${selectedIds.size} selected transactions?`))
-                      deleteTransactions(Array.from(selectedIds));
+                      deleteTransactions(Array.from(selectedIds))
                   }}
                 >
                   Delete ({selectedIds.size})
@@ -267,7 +182,7 @@ const Dashboard = ({ chatId, onLogout }: { chatId: number | null; onLogout: () =
                   <th className="checkbox-cell">
                     <input
                       type="checkbox"
-                      checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                      checked={allSelected}
                       onChange={(e) => toggleSelectAll(e.target.checked)}
                     />
                   </th>
@@ -306,7 +221,7 @@ const Dashboard = ({ chatId, onLogout }: { chatId: number | null; onLogout: () =
 
       {status && <div className="global-status">{status}</div>}
     </div>
-  );
-};
+  )
+}
 
-export default Dashboard;
+export default Dashboard
