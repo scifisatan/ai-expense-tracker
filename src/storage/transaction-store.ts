@@ -1,4 +1,4 @@
-import type { TransactionItem } from '../bot/types';
+import type { TransactionItem } from "../bot/types";
 
 export type StoredTransaction = {
   id: number;
@@ -20,9 +20,9 @@ export const createTransactionStore = (db: D1Database) => {
             `
               INSERT INTO transactions (chat_id, user_id, amount, type, note)
               VALUES (?, ?, ?, ?, ?)
-            `
+            `,
           )
-          .bind(chatId, userId, Math.abs(item.amount), item.type, item.note || note || null)
+          .bind(chatId, userId, Math.abs(item.amount), item.type, item.note || note || null),
       );
 
       await db.batch(statements);
@@ -37,7 +37,7 @@ export const createTransactionStore = (db: D1Database) => {
             WHERE chat_id = ?
             ORDER BY id DESC
             LIMIT ?
-          `
+          `,
         )
         .bind(chatId, limit)
         .all<{

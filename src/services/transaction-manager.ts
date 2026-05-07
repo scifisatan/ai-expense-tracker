@@ -1,8 +1,7 @@
-import { createAIService } from './ai';
-import { createTransactionStore } from '../storage/transaction-store';
-import { computeTotals } from '../bot/transactions';
-import { log } from '../config/logger';
-import { LedgerDisplay } from './ledger-display/interface';
+import { createAIService } from "./ai";
+import { createTransactionStore } from "../storage/transaction-store";
+import { computeTotals } from "../bot/transactions";
+import { LedgerDisplay } from "./ledger-display/interface";
 
 export interface TransactionManagerConfig {
   db: D1Database;
@@ -17,7 +16,7 @@ export const createTransactionManager = (config: TransactionManagerConfig) => {
   /**
    * Internal helper to ensure 'Income' is always stored as 'Income'
    */
-  const normalizeType = (type: string) => (type === 'Income' ? 'Income' : type);
+  const normalizeType = (type: string) => (type === "Income" ? "Income" : type);
 
   /**
    * Recalculates the entire balance from history and updates the display.
@@ -27,12 +26,12 @@ export const createTransactionManager = (config: TransactionManagerConfig) => {
     // We fetch a large enough history to get an accurate balance
     const transactions = await store.listRecent(chatId, 1000);
     const totalIncome = transactions
-      .filter((tx) => tx.type === 'Income' || tx.type === 'Income')
+      .filter((tx) => tx.type === "Income")
       .reduce((sum, tx) => sum + tx.amount, 0);
     const totalExpense = transactions
-      .filter((tx) => tx.type === 'Expense')
+      .filter((tx) => tx.type === "Expense")
       .reduce((sum, tx) => sum + tx.amount, 0);
-    
+
     const currentBalance = totalIncome - totalExpense;
     await config.display.updateBalance(chatId, currentBalance);
     return currentBalance;
@@ -55,18 +54,15 @@ export const createTransactionManager = (config: TransactionManagerConfig) => {
       }));
 
       const { net } = computeTotals(normalizedItems);
-      
+
       // We calculate current balance from history to be safe
       const transactions = await store.listRecent(chatId, 1000);
-      const historyBalance = transactions
-        .filter((tx) => tx.type === 'Income' || tx.type === 'Income')
-        .reduce((sum, tx) => sum + tx.amount, 0) -
-        transactions
-        .filter((tx) => tx.type === 'Expense')
-        .reduce((sum, tx) => sum + tx.amount, 0);
+      const historyBalance =
+        transactions.filter((tx) => tx.type === "Income").reduce((sum, tx) => sum + tx.amount, 0) -
+        transactions.filter((tx) => tx.type === "Expense").reduce((sum, tx) => sum + tx.amount, 0);
 
       const newBalance = historyBalance + net;
-      
+
       await store.addMany(chatId, userId, normalizedItems, text);
       await config.display.updateBalance(chatId, newBalance);
 
@@ -81,20 +77,26 @@ export const createTransactionManager = (config: TransactionManagerConfig) => {
      * The primary entry point for the Web Dashboard.
      * Updates an existing transaction and refreshes the balance display.
      */
-    async updateTransaction(chatId: number, transactionId: number, patch: { amount?: number; type?: string; note?: string | null }) {
+    async updateTransaction(
+      chatId: number,
+      transactionId: number,
+      patch: { amount?: number; type?: string; note?: string | null },
+    ) {
       const current = await config.db
-        .prepare('SELECT id, amount, type, note FROM transactions WHERE id = ? AND chat_id = ?')
+        .prepare("SELECT id, amount, type, note FROM transactions WHERE id = ? AND chat_id = ?")
         .bind(transactionId, chatId)
         .first<{ id: number; amount: number; type: string; note: string | null }>();
 
-      if (!current) throw new Error('TRANSACTION_NOT_FOUND');
+      if (!current) throw new Error("TRANSACTION_NOT_FOUND");
 
       const nextAmount = patch.amount !== undefined ? Math.abs(patch.amount) : current.amount;
       const nextType = patch.type ? normalizeType(patch.type) : current.type;
       const nextNote = patch.note !== undefined ? patch.note : current.note;
 
       await config.db
-        .prepare('UPDATE transactions SET amount = ?, type = ?, note = ? WHERE id = ? AND chat_id = ?')
+        .prepare(
+          "UPDATE transactions SET amount = ?, type = ?, note = ? WHERE id = ? AND chat_id = ?",
+        )
         .bind(nextAmount, nextType, nextNote, transactionId, chatId)
         .run();
 
@@ -105,7 +107,7 @@ export const createTransactionManager = (config: TransactionManagerConfig) => {
     async deleteTransactions(chatId: number, ids: number[]) {
       if (ids.length === 0) return { newBalance: await refreshPinnedBalance(chatId) };
 
-      const placeholders = ids.map(() => '?').join(',');
+      const placeholders = ids.map(() => "?").join(",");
       await config.db
         .prepare(`DELETE FROM transactions WHERE chat_id = ? AND id IN (${placeholders})`)
         .bind(chatId, ...ids)
@@ -113,7 +115,7 @@ export const createTransactionManager = (config: TransactionManagerConfig) => {
 
       const newBalance = await refreshPinnedBalance(chatId);
       return { newBalance };
-    }
+    },
   };
 };
 

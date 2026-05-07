@@ -1,9 +1,12 @@
 {
   "name": "bot",
   "version": "1.0.0",
+  "private": true,
   "description": "",
-  "main": "src/index.ts",
+  "license": "ISC",
+  "author": "",
   "type": "module",
+  "main": "src/index.ts",
   "scripts": {
     "dev": "vite",
     "deploy": "wrangler deploy",
@@ -11,38 +14,40 @@
     "db:migrate:local": "wrangler d1 migrations apply telegram_budget_bot --local",
     "db:migrate:remote": "wrangler d1 migrations apply telegram_budget_bot --remote",
     "build": "vite build",
-    "lint": "eslint . --ext .ts,.js,.tsx",
-    "format": "prettier --write .",
-    "test": "bun test"
+    "lint": "oxlint .",
+    "format": "oxfmt . --write",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
-  "packageManager": "bun@1.3.4",
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "@ai-sdk/groq": "^2.0.32",
     "@cloudflare/vite-plugin": "^1.36.0",
+    "@hono/trpc-server": "^0.4.2",
+    "@tanstack/react-query": "^5.100.9",
+    "@trpc/client": "^11.17.0",
+    "@trpc/react-query": "^11.17.0",
+    "@trpc/server": "^11.17.0",
     "ai": "^5.0.108",
-    "clsx": "^2.1.1",
     "grammy": "^1.39.3",
     "hono": "^4.11.7",
-    "lucide-react": "^1.14.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "tailwind-merge": "^3.5.0",
     "vite-ssr-components": "^0.6.1",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.16.0",
     "@cloudflare/workers-types": "^4.20260502.0",
-    "@types/bun": "latest",
     "@types/node": "^20.19.26",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
-    "eslint": "^8.52.0",
-    "prettier": "^3.7.4",
+    "@vitest/ui": "^4.1.5",
+    "oxfmt": "^0.48.0",
+    "oxlint": "^1.63.0",
     "typescript": "^5.9.3",
-    "vite": "^7.1.12",
+    "vite": "^8.0.10",
+    "vitest": "^4.1.5",
     "wrangler": "^4.62.0"
   },
-  "private": true
+  "packageManager": "bun@1.3.4"
 }

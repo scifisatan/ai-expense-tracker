@@ -1,18 +1,18 @@
-import { createGroq } from '@ai-sdk/groq';
-import { generateText } from 'ai';
-import { z } from 'zod';
-import { log } from '../config/logger';
+import { createGroq } from "@ai-sdk/groq";
+import { generateText } from "ai";
+import { z } from "zod";
+import { log } from "../config/logger";
 
 const transactionItemSchema = z.object({
-  amount: z.number().int().describe('Transaction amount as positive integer'),
-  type: z.enum(['Expense', 'Income']).describe('Money flow direction'),
-  note: z.string().describe('Note related to the transaction'),
+  amount: z.number().int().describe("Transaction amount as positive integer"),
+  type: z.enum(["Expense", "Income"]).describe("Money flow direction"),
+  note: z.string().describe("Note related to the transaction"),
 });
 
 const transactionsSchema = z.object({
   items: z
     .array(transactionItemSchema)
-    .describe('List of all transactions mentioned; empty if none'),
+    .describe("List of all transactions mentioned; empty if none"),
 });
 
 export type TransactionItem = z.infer<typeof transactionItemSchema>;
@@ -20,20 +20,15 @@ export type TransactionsExtraction = z.infer<typeof transactionsSchema>;
 
 export const createAIService = (options: { model: string }) => {
   return {
-    async extractTransactions(
-      message: string,
-      groqToken: string
-    ): Promise<TransactionsExtraction> {
+    async extractTransactions(message: string, groqToken: string): Promise<TransactionsExtraction> {
       const groq = createGroq({ apiKey: groqToken });
 
-      log.debug('ai.extractTransactions.model', options.model);
-      log.debug('ai.extractTransactions.prompt', message);
+      log.debug("ai.extractTransactions.model", options.model);
+      log.debug("ai.extractTransactions.prompt", message);
 
       const { text } = await generateText({
         model: groq(options.model) as any,
-        prompt: `Extract every monetary transaction mentioned in the message.
-
-Message: "${message}"
+        system: `Extract every monetary transaction mentioned in the message.
 
 Return ONLY valid JSON with this exact shape:
 {"items":[{"amount":123,"type":"Expense","note":"coffee"}]}
@@ -46,12 +41,13 @@ Rules:
 - If no clear note is associated, use an empty string.
 - If no clear amounts are found, return: {"items":[]}
 - Do not include markdown, backticks, or extra text.`,
+        prompt: message,
       });
 
       const cleaned = text
         .trim()
-        .replace(/^```(?:json)?\s*/i, '')
-        .replace(/\s*```$/, '');
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/, "");
 
       try {
         const parsed = JSON.parse(cleaned);

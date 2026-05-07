@@ -1,4 +1,4 @@
-import type { Api } from 'grammy';
+import type { Api } from "grammy";
 
 export const createTelegramService = (api: Api) => {
   return {

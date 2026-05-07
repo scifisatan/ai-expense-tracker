@@ -1,33 +1,33 @@
-import type { SessionManager, SessionPayload, OtpChallengePayload } from './interface';
+import type { SessionManager, SessionPayload, OtpChallengePayload } from "./interface";
 
 export class TokenSessionManager implements SessionManager {
   constructor(private secret: string) {}
 
   private base64UrlEncode(value: string) {
-    return btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    return btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
   }
 
   private base64UrlDecode(value: string) {
-    const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
-    const pad = normalized.length % 4 === 0 ? '' : '='.repeat(4 - (normalized.length % 4));
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    const pad = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
     return atob(normalized + pad);
   }
 
   private async hmac(value: string) {
     const key = await crypto.subtle.importKey(
-      'raw',
+      "raw",
       new TextEncoder().encode(this.secret),
-      { name: 'HMAC', hash: 'SHA-256' },
+      { name: "HMAC", hash: "SHA-256" },
       false,
-      ['sign']
+      ["sign"],
     );
-    const signed = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value));
+    const signed = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
     return this.base64UrlEncode(String.fromCharCode(...new Uint8Array(signed)));
   }
 
   private async sha256Hex(value: string) {
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
   }
 
   private async signToken(payload: any): Promise<string> {
@@ -44,7 +44,7 @@ export class TokenSessionManager implements SessionManager {
   }
 
   async verifySession(token: string): Promise<SessionPayload | null> {
-    const [body, sig] = token.split('.');
+    const [body, sig] = token.split(".");
     if (!body || !sig) return null;
     if (sig !== (await this.hmac(body))) return null;
 
@@ -58,7 +58,7 @@ export class TokenSessionManager implements SessionManager {
   }
 
   async issueOtpChallenge(chatId: number) {
-    const otp = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0');
+    const otp = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0");
     const nonce = crypto.randomUUID();
     const exp = Date.now() + 5 * 60 * 1000;
     const otpHash = await this.sha256Hex(`${otp}:${chatId}:${nonce}`);
@@ -74,14 +74,14 @@ export class TokenSessionManager implements SessionManager {
   }
 
   async verifyOtpChallenge(challengeToken: string, chatId: number, otp: string): Promise<boolean> {
-    const [body, sig] = challengeToken.split('.');
+    const [body, sig] = challengeToken.split(".");
     if (!body || !sig) return false;
     if (sig !== (await this.hmac(body))) return false;
 
     try {
       const challenge = JSON.parse(this.base64UrlDecode(body)) as OtpChallengePayload;
       if (challenge.exp < Date.now() || challenge.chatId !== chatId) return false;
-      
+
       const actualHash = await this.sha256Hex(`${otp}:${chatId}:${challenge.nonce}`);
       return actualHash === challenge.otpHash;
     } catch {

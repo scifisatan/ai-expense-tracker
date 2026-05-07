@@ -1,6 +1,7 @@
 # Telegram Budget Bot (Cloudflare Workers)
 
 Telegram budget tracker running on **Cloudflare Workers** using:
+
 - **Hono** for webhook HTTP routing
 - **grammY** for Telegram bot handling
 - **D1** for per-user config (Groq API key) and per-chat transaction history
@@ -27,6 +28,7 @@ Configure in `wrangler.jsonc` / `wrangler secret`:
 ## D1 setup
 
 1. Create DB:
+
 ```bash
 wrangler d1 create telegram_budget_bot
 ```
@@ -34,6 +36,7 @@ wrangler d1 create telegram_budget_bot
 2. Put returned `database_id` in `wrangler.jsonc`.
 
 3. Apply migrations:
+
 ```bash
 npm run db:migrate:local
 # or for deployed DB
@@ -78,6 +81,7 @@ https://<your-worker-domain>/webhook
 ```
 
 Example:
+
 ```bash
 curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook" \
   -d "url=https://<your-worker-domain>/webhook"

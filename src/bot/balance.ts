@@ -1,6 +1,6 @@
-import type { Api } from 'grammy';
-import { parseBalance } from '../utils/parser';
-import type { BalanceInfo } from './types';
+import type { Api } from "grammy";
+import { parseBalance } from "../utils/parser";
+import type { BalanceInfo } from "./types";
 
 export const createBalanceService = (api: Api) => {
   return {
@@ -16,7 +16,7 @@ export const createBalanceService = (api: Api) => {
           }
         }
       } catch (e) {
-        console.error('[balance-fetch-error]', e);
+        console.error("[balance-fetch-error]", e);
       }
 
       return { balance: null };

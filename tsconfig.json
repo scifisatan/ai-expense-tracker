@@ -8,9 +8,9 @@
     "lib": ["ESNext", "DOM"],
     "jsx": "react-jsx",
     "jsxImportSource": "react",
-    "types": ["@cloudflare/workers-types", "vite/client"],
+    "types": ["@cloudflare/workers-types", "vite/client", "bun-types"],
     "forceConsistentCasingInFileNames": true,
-    "rootDir": "src",
+    "rootDir": ".",
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
@@ -19,6 +19,6 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "test/**/*"],
   "exclude": ["node_modules", "dist"]
 }

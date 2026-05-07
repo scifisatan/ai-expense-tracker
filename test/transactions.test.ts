@@ -1,13 +1,13 @@
-import { describe, it, expect } from 'bun:test';
-import { computeTotals } from '../src/bot/transactions';
+import { describe, it, expect } from "vitest";
+import { computeTotals } from "../src/bot/transactions";
 
-describe('computeTotals', () => {
-  it('computes totals correctly', () => {
+describe("computeTotals", () => {
+  it("computes totals correctly", () => {
     const items = [
-      { amount: 100, type: 'Income' },
-      { amount: 40, type: 'Expense' },
-      { amount: 30, type: 'Expense' },
-      { amount: 200, type: 'Income' },
+      { amount: 100, type: "Income" },
+      { amount: 40, type: "Expense" },
+      { amount: 30, type: "Expense" },
+      { amount: 200, type: "Income" },
     ];
 
     const { totalIncome, totalExpense, net } = computeTotals(items as any);

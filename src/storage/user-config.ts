@@ -1,10 +1,10 @@
-import { TokenSessionManager } from '../services/auth/token-manager';
+import { TokenSessionManager } from "../services/auth/token-manager";
 
 export const createUserConfigStore = (db: D1Database) => {
   return {
     async getGroqApiKey(userId: number): Promise<string | null> {
       const row = await db
-        .prepare('SELECT groq_api_key FROM user_settings WHERE user_id = ?')
+        .prepare("SELECT groq_api_key FROM user_settings WHERE user_id = ?")
         .bind(userId)
         .first<{ groq_api_key: string | null }>();
 
@@ -20,7 +20,7 @@ export const createUserConfigStore = (db: D1Database) => {
             ON CONFLICT(user_id) DO UPDATE SET
               groq_api_key = excluded.groq_api_key,
               updated_at = CURRENT_TIMESTAMP
-          `
+          `,
         )
         .bind(userId, apiKey)
         .run();
@@ -31,7 +31,7 @@ export const createUserConfigStore = (db: D1Database) => {
         .prepare(
           `
             UPDATE user_settings SET groq_api_key = NULL, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?
-          `
+          `,
         )
         .bind(userId)
         .run();
