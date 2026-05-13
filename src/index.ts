@@ -8,6 +8,8 @@ import type { AppEnv } from "@/apps/env"
 
 const app = new Hono<AppEnv>()
 
+app.get("/", (c) => c.redirect("/app"))
+
 app.route("/", botRoutes)
 app.route("/app", webRoutes)
 app.route("/api", apiRoutes)

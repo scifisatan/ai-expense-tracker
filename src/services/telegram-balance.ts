@@ -1,5 +1,5 @@
 import { Api } from "grammy"
-import type { LedgerBalancePublisher } from "@/shared/service/ledger-service"
+import type { LedgerBalancePublisher } from "@/services/ledger"
 
 export type TelegramBalanceInfo = {
   balance: number | null

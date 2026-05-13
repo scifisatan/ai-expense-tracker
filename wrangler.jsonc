@@ -1,23 +1,33 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "telegram-budget-bot",
-  "main": "src/index.tsx",
-  "compatibility_date": "2026-05-06",
-  "observability": {
-    "enabled": true
-  },
-  "d1_databases": [
-    {
-      "database_name": "telegram_budget_bot",
-      "binding": "DB",
-      "database_id": "aafc7c03-08cd-47ab-a5cf-1185176d569c"
-    }
-  ],
-  "vars": {
-    "AI_MODEL": "meta-llama/llama-4-scout-17b-16e-instruct"
-  },
-  "assets": {
-    "directory": "./dist/client",
-    "binding": "ASSETS"
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "telegram-budget-bot",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-05-06",
+	"observability": {
+		"enabled": true
+	},
+	"d1_databases": [
+		{
+			"database_name": "telegram_budget_bot",
+			"binding": "DB",
+			"database_id": "aafc7c03-08cd-47ab-a5cf-1185176d569c"
+		}
+	],
+	"vars": {
+		"AI_MODEL": "meta-llama/llama-4-scout-17b-16e-instruct"
+	},
+	"routes": [
+		{
+			"pattern": "budget.abishrestha.com.np",
+			"custom_domain": true,
+			"enabled": true,
+			"previews_enabled": false
+		}
+	],
+	"kv_namespaces": [
+		{
+			"binding": "BOT_INFO",
+			"id": "36173710ccd74edd936b4cb0e9f22e01"
+		}
+	]
 }

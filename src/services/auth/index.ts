@@ -1,6 +1,6 @@
-import { AuthIdentifier, VerifyOtpInput } from "@/shared/types/auth"
-import { sendTelegramOtp } from "@/shared/service/auth-service/telegram-otp"
-import { createTokenSession, type TokenSession } from "@/shared/service/auth-service/token-session"
+import { AuthIdentifier, VerifyOtpInput } from "@/shared/types"
+import { sendTelegramOtp } from "@/services/auth/telegram-otp"
+import { createTokenSession, type TokenSession } from "@/services/auth/token-session"
 
 type AuthServiceDeps = {
   session: TokenSession

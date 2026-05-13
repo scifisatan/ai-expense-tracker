@@ -1,5 +1,23 @@
 import { z } from "zod"
+import type { Transaction, NewTransaction } from '@/db/schema'
 
+// Auth Types
+export const authIdentifierSchema = z.object({
+  username: z.string().optional(),
+  chatId: z.number().optional()
+})
+
+export const requestOtpInputSchema = authIdentifierSchema
+
+export const verifyOtpInputSchema = authIdentifierSchema.extend({
+  otp: z.string(),
+  challengeToken: z.string()
+})
+
+export type AuthIdentifier = z.infer<typeof authIdentifierSchema>
+export type VerifyOtpInput = z.infer<typeof verifyOtpInputSchema>
+
+// Ledger Types
 export const transactionTypeSchema = z.enum(["Income", "Expense"])
 
 export const transactionsListInputSchema = z.object({
@@ -19,14 +37,7 @@ export const transactionsDeleteInputSchema = z.object({
 
 export type TransactionType = "Income" | "Expense"
 
-export type LedgerTransaction = {
-  id: number
-  chatId: number
-  amount: number
-  type: TransactionType
-  note: string | null
-  createdAt: string
-}
+export type LedgerTransaction = Transaction
 
 export type BalanceProjection = {
   income: number
@@ -35,17 +46,9 @@ export type BalanceProjection = {
   transactions: number
 }
 
-export type NewLedgerTransaction = {
-  amount: number
-  type: TransactionType
-  note?: string | null
-}
+export type NewLedgerTransaction = Pick<NewTransaction, 'amount' | 'type' | 'note'>
 
-export type LedgerTransactionPatch = {
-  amount?: number
-  type?: TransactionType
-  note?: string | null
-}
+export type LedgerTransactionPatch = Partial<NewLedgerTransaction>
 
 export const transactionItemSchema = z.object({
   amount: z.number().int().describe("Transaction amount as positive integer"),

@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react"
 import { money } from "../helper"
 import { Transaction } from "@web/types"
-import { TransactionType } from "@/shared/types/ledger"
+import { TransactionType } from "@/shared/types"
 
 const EditableRow = ({
   tx,

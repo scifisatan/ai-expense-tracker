@@ -1,6 +1,7 @@
 import type { Context } from "hono"
 
 export type CloudflareBindings = {
+  BOT_INFO: KVNamespace
   BOT_TOKEN?: string
   AI_MODEL?: string
   WEBHOOK_URL?: string

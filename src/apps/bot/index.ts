@@ -2,83 +2,62 @@ import { Bot } from "grammy"
 import { Hono } from "hono"
 import { BotContext } from "@bot/types"
 import { registerHandlers } from "@bot/handlers"
+import { log } from "@/utils/logger"
 
 import type { Update } from "grammy/types"
-import type { AppContext, AppEnv } from "@apps/env"
+import type { AppEnv } from "@apps/env"
 
 const botRoutes = new Hono<AppEnv>()
 
-const handleUpdate = async (c: AppContext) => {
+botRoutes.post("/", async (c) => {
   try {
     const update = (await c.req.json()) as Update
 
-    const updateType = Object.keys(update).find((key) => key !== "update_id")
-
-    console.info("[webhook-received]", {
-      updateId: update.update_id,
-      type: updateType
-    })
-
     const token = c.env.BOT_TOKEN
+    const botInfo = await c.env.BOT_INFO.get("BOT_INFO")
+
     if (!token) {
-      throw new Error("Missing BOT_TOKEN binding")
+      const errorMsg: string = "Missing BOT_TOKEN binding"
+      log.bot.error(errorMsg)
+      throw new Error(errorMsg)
     }
 
-    const bot = new Bot<BotContext>(token)
+    if (!botInfo) {
+      const errorMsg: string = "Missing BOT_INFO binding"
+      log.bot.error(errorMsg, botInfo)
+      throw new Error(errorMsg)
+    }
+
+    const bot = new Bot<BotContext>(token, {
+      botInfo: JSON.parse(botInfo)
+    })
 
     bot.use(async (ctx, next) => {
       ctx.env = c.env
+
+      const chatId = ctx.chatId
+      const username = ctx.from?.username ?? ""
+      const message = ctx.message?.text ?? ""
+      log.bot.debug(`Message from @${username} #${chatId}`, message)
+
       await next()
     })
 
     registerHandlers(bot)
-
-    await bot.init()
     await bot.handleUpdate(update)
 
     return c.json({ ok: true })
   } catch (error) {
-    console.error("[webhook-error]", error)
-
+    log.bot.error("Failed to process update")
     return c.json(
       {
         ok: false,
-        error: "Failed to process update"
+        error: "Failed to process update",
+        logs: error
       },
       500
     )
   }
-}
-
-botRoutes.post("/webhook", async (c) => {
-  return handleUpdate(c)
 })
-
-botRoutes.post("/bot*", async (c) => {
-  const effectiveToken = c.env.BOT_TOKEN
-
-  const path = c.req.path
-  const pathToken = path.slice("/bot".length)
-
-  if (!effectiveToken || pathToken !== effectiveToken) {
-    console.warn("[webhook-rejected]", {
-      reason: "token_mismatch",
-      hasEffectiveToken: Boolean(effectiveToken),
-      path: c.req.path
-    })
-
-    return c.json(
-      {
-        ok: false,
-        error: "Invalid bot token received"
-      },
-      403
-    )
-  }
-
-  return handleUpdate(c)
-})
-
-botRoutes.get("/", (c) => c.redirect("/app"))
 
 export default botRoutes

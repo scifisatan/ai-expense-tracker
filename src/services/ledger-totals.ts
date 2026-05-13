@@ -1,4 +1,4 @@
-import type { TransactionType } from "@/shared/types/ledger"
+import type { TransactionType } from "@/shared/types"
 
 type LedgerAmount = {
   amount: number

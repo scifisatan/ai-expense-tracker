@@ -1,6 +1,6 @@
 import { createGroq } from "@ai-sdk/groq"
 import { generateText } from "ai"
-import { TransactionsExtraction, transactionsSchema } from "@/shared/types/ledger"
+import { TransactionsExtraction, transactionsSchema } from "@/shared/types"
 import { log } from "@/utils/logger"
 
 export const createAiService = (options: { model: string }) => {
@@ -8,8 +8,8 @@ export const createAiService = (options: { model: string }) => {
     async extractTransactions(message: string, groqToken: string): Promise<TransactionsExtraction> {
       const groq = createGroq({ apiKey: groqToken })
 
-      log.debug("ai.extractTransactions.model", options.model)
-      log.debug("ai.extractTransactions.prompt", message)
+      log.ai.debug("ai.extractTransactions.model", options.model)
+      log.ai.debug("ai.extractTransactions.prompt", message)
 
       const { text } = await generateText({
         model: groq(options.model) as any,

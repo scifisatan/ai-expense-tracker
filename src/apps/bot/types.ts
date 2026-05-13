@@ -1,6 +1,6 @@
-import { Context as GrammyContext } from "grammy"
-import { CloudflareBindings } from "@apps/env"
+import type { Context } from "grammy"
+import type { CloudflareBindings } from "@/apps/env"
 
-export type BotContext = GrammyContext & {
+export type BotContext = Context & {
   env: CloudflareBindings
 }

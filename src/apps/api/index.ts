@@ -4,26 +4,33 @@ import { router, type ApiServices } from "@api/router"
 import type { AppEnv, CloudflareBindings } from "@/apps/env"
 import { SESSION_COOKIE } from "@/utils/constants"
 import { getCookie } from "@/utils/cookies"
-import { createTokenSession } from "@/shared/service/auth-service"
-import { createAppContext } from "@/shared/service/create-app-context"
-import { createTelegramBalancePublisher } from "@/shared/service/telegram-bot-service"
+import { createDb } from '@/db/client'
+import { createTelegramAuthService, createTokenSession } from "@/services/auth"
+import { createLedgerService } from "@/services/ledger"
+import { createTelegramBalancePublisher } from "@/services/telegram-balance"
+import { log } from "@/utils/logger"
 
 const apiRoutes = new Hono<AppEnv>()
 
+apiRoutes.use("*", async (c, next) => {
+  const start = Date.now()
+  await next()
+  const ms = Date.now() - start
+  log.api.info(`${c.req.method} ${c.req.url} - ${c.res.status} (${ms}ms)`)
+})
+
 const createApiServices = (env: CloudflareBindings): ApiServices => {
+  const db = createDb(env.DB)
   const botToken = env.BOT_TOKEN
-  const appContext = createAppContext({
-    db: env.DB,
-    env,
-    telegram: {
-      balancePublisher: createTelegramBalancePublisher(botToken),
-      botToken
-    }
-  })
+  const balancePublisher = createTelegramBalancePublisher(botToken)
+  const ledger = createLedgerService(db, balancePublisher)
 
   return {
-    auth: appContext.createOtpAuth,
-    ledger: appContext.ledger
+    auth: () => createTelegramAuthService({
+      botToken,
+      authSecret: botToken
+    }),
+    ledger
   }
 }
 
