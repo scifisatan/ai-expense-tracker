@@ -8,6 +8,7 @@ import TransactionDialog from "./TransactionDialog"
 
 type Props = {
   categories: Category[]
+  currency: string
   onCreate: (input: {
     amount: number
     type: TransactionType
@@ -18,7 +19,7 @@ type Props = {
 }
 
 // Natural-language first — type the way you'd tell a friend. Manual entry is one tap away.
-const CommandBar = ({ categories, onCreate, onAddFromText }: Props) => {
+const CommandBar = ({ categories, currency, onCreate, onAddFromText }: Props) => {
   const [text, setText] = useState("")
   const [busy, setBusy] = useState(false)
   const [manualOpen, setManualOpen] = useState(false)
@@ -88,6 +89,7 @@ const CommandBar = ({ categories, onCreate, onAddFromText }: Props) => {
         onOpenChange={setManualOpen}
         mode="create"
         categories={categories}
+        currency={currency}
         onCreate={onCreate}
       />
     </>

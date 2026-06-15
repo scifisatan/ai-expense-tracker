@@ -15,11 +15,12 @@ import TransactionDialog from "./TransactionDialog"
 type Props = {
   tx: Transaction
   categories: Category[]
+  currency: string
   onUpdate: (tx: Transaction, patch: TxUpdatePatch) => Promise<void>
   onDelete: (id: number) => Promise<void>
 }
 
-const ActivityItem = ({ tx, categories, onUpdate, onDelete }: Props) => {
+const ActivityItem = ({ tx, categories, currency, onUpdate, onDelete }: Props) => {
   const [editOpen, setEditOpen] = useState(false)
 
   const categoryName = useMemo(
@@ -41,6 +42,10 @@ const ActivityItem = ({ tx, categories, onUpdate, onDelete }: Props) => {
       return ""
     }
   }, [tx.occurredAt])
+
+  const confirmDelete = () => {
+    if (confirm("Delete this transaction?")) void onDelete(tx.id)
+  }
 
   return (
     <>
@@ -89,9 +94,7 @@ const ActivityItem = ({ tx, categories, onUpdate, onDelete }: Props) => {
             </DropdownMenuItem>
             <DropdownMenuItem
               variant="destructive"
-              onSelect={() => {
-                if (confirm("Delete this transaction?")) void onDelete(tx.id)
-              }}
+              onSelect={confirmDelete}
             >
               <Trash2 className="size-4" /> Delete
             </DropdownMenuItem>
@@ -105,7 +108,12 @@ const ActivityItem = ({ tx, categories, onUpdate, onDelete }: Props) => {
         mode="edit"
         initial={tx}
         categories={categories}
+        currency={currency}
         onUpdate={onUpdate}
+        onDelete={() => {
+          confirmDelete()
+          setEditOpen(false)
+        }}
       />
     </>
   )

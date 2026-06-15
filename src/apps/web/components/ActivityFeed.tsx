@@ -11,6 +11,7 @@ import ActivityItem from "./ActivityItem"
 type Props = {
   transactions: Transaction[]
   categories: Category[]
+  currency: string
   isLoading: boolean
   onUpdate: (tx: Transaction, patch: TxUpdatePatch) => Promise<void>
   onDelete: (id: number) => Promise<void>
@@ -32,7 +33,7 @@ const dayLabel = (d: Date): string => {
 
 const TYPES = ["All", "Income", "Expense"] as const
 
-const ActivityFeed = ({ transactions, categories, isLoading, onUpdate, onDelete }: Props) => {
+const ActivityFeed = ({ transactions, categories, currency, isLoading, onUpdate, onDelete }: Props) => {
   const { search, setSearch, typeFilter, setTypeFilter, filtered } =
     useTransactionFilter(transactions)
 
@@ -124,6 +125,7 @@ const ActivityFeed = ({ transactions, categories, isLoading, onUpdate, onDelete 
                     key={tx.id}
                     tx={tx}
                     categories={categories}
+                    currency={currency}
                     onUpdate={onUpdate}
                     onDelete={onDelete}
                   />
