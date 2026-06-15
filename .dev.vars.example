@@ -1,3 +1,9 @@
 BOT_TOKEN=your-telegram-bot-token
 AI_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
 WEBHOOK_URL=your-application-url
+
+# Web account identity (Google OAuth) + session signing
+SESSION_SECRET=generate-a-long-random-string
+GOOGLE_CLIENT_ID=your-google-oauth-client-id
+GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
+APP_URL=http://localhost:3001

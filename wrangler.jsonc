@@ -14,7 +14,8 @@
 		}
 	],
 	"vars": {
-		"AI_MODEL": "meta-llama/llama-4-scout-17b-16e-instruct"
+		"AI_MODEL": "meta-llama/llama-4-scout-17b-16e-instruct",
+		"APP_URL": "https://budget.abishrestha.com.np"
 	},
 	"routes": [
 		{

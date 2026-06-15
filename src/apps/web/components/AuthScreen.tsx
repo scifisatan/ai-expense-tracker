@@ -1,96 +1,52 @@
-import react from "react"
-import { useOtpChallenge } from "@web/hooks/useOtpChallenge"
+import { Wallet, MessageCircle } from "lucide-react"
 
-const AuthScreen = ({ onLogin }: { onLogin: () => void }) => {
-  const {
-    identifier,
-    otp,
+import { Button } from "@web/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@web/components/ui/card"
+import ThemeToggle from "@web/components/ThemeToggle"
 
-    challengeStarted,
-
-    loading,
-
-    message,
-    isError,
-
-    canRequestOtp,
-    canVerifyOtp,
-
-    onIdentifierChange,
-    onOtpChange,
-
-    requestOtp,
-    verifyOtp,
-    reset
-  } = useOtpChallenge(onLogin)
-
-  const handleRequestOtp = async (e: react.FormEvent) => {
-    e.preventDefault()
-    await requestOtp()
-  }
-
-  const handleVerifyOtp = async (e: react.FormEvent) => {
-    e.preventDefault()
-    await verifyOtp()
-  }
-
+const AuthScreen = () => {
   return (
-    <div className="app-shell">
-      <div className="auth-wrap">
-        <div className="auth-card">
-          <div className="auth-logo">💰 Budget Bot</div>
-
-          <p className="auth-sub">Sign in with your Telegram OTP to view your dashboard.</p>
-
-          {!challengeStarted ? (
-            <form onSubmit={handleRequestOtp}>
-              <div className="field">
-                <label>Telegram Username or Chat ID</label>
-
-                <input
-                  value={identifier}
-                  onChange={onIdentifierChange}
-                  placeholder="e.g. @username or 123456789"
-                  autoFocus
-                />
-              </div>
-
-              <button className="btn-primary" disabled={!canRequestOtp || loading}>
-                {loading ? "Sending…" : "Send OTP →"}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOtp}>
-              <div className="field">
-                <label>One-Time Password</label>
-
-                <input
-                  value={otp}
-                  onChange={onOtpChange}
-                  placeholder="6-digit code"
-                  maxLength={6}
-                  autoFocus
-                />
-              </div>
-
-              <button className="btn-primary" disabled={!canVerifyOtp || loading}>
-                {loading ? "Verifying…" : "Verify & Sign In →"}
-              </button>
-
-              <button
-                type="button"
-                className="btn-ghost"
-                style={{ width: "100%", marginTop: 8 }}
-                onClick={reset}
-              >
-                ← Back
-              </button>
-            </form>
-          )}
-
-          {message && <p className={`status-msg${isError ? " error" : ""}`}>{message}</p>}
-        </div>
+    <div className="relative flex min-h-dvh items-center justify-center bg-background px-4 py-12 text-foreground">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
       </div>
+
+      <Card className="w-full max-w-sm">
+        <CardHeader className="items-center text-center">
+          <div className="flex size-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+            <Wallet className="size-6" />
+          </div>
+          <CardTitle className="mt-4 text-xl">Welcome to Budget</CardTitle>
+          <CardDescription>
+            Track your spending on the web and through Telegram — calm,
+            private, and always in sync.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          {/* Server-side OAuth redirect — must stay a plain link, not a tRPC call. */}
+          <Button asChild size="lg" className="w-full">
+            <a href="/api/auth/google">Sign in with Google</a>
+          </Button>
+        </CardContent>
+
+        <CardFooter>
+          <p className="flex items-start gap-2 text-sm text-muted-foreground">
+            <MessageCircle className="mt-0.5 size-4 shrink-0" />
+            <span>
+              After signing in, connect Telegram from Settings to add
+              transactions in natural language.
+            </span>
+          </p>
+        </CardFooter>
+      </Card>
     </div>
   )
 }

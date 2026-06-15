@@ -1,171 +1,131 @@
-import type { Bot } from "grammy"
-import type { BotContext } from "@bot/types"
-import { createBotController } from "../controller"
-import { getChatKeyboard, getMissingKeyWarning, formatMoney } from "../ui"
+import type { Bot } from "grammy";
+import type { BotContext } from "@bot/types";
+import {
+  BUTTON_BALANCE_RE,
+  BUTTON_HELP_RE,
+  BUTTON_TRANSACTIONS_RE,
+  getChatKeyboard,
+  msg,
+} from "../ui";
+
+const appUrl = (ctx: BotContext) =>
+  ctx.env.APP_URL?.replace(/\/$/, "") ?? ctx.env.WEBHOOK_URL?.replace(/\/$/, "") ?? null;
+
+// Replies with the connect-account instructions when the chat is not linked.
+const requireLinked = async (ctx: BotContext): Promise<boolean> => {
+  if (ctx.accountId) return true;
+  await ctx.reply(msg.notLinked(appUrl(ctx)), {
+    parse_mode: "Markdown",
+    link_preview_options: { is_disabled: true },
+  });
+  return false;
+};
 
 export const registerCommandHandlers = (bot: Bot<BotContext>) => {
   const sendHelp = async (ctx: BotContext, chatId: number) => {
-    await ctx.api.sendMessage(
-      chatId,
-      [
-        "👋 *Budget Bot Help*",
-        "",
-        "• Send messages like `Paid 200`, `Got 500`, `Spent 120 and 80`",
-        "• I extract transactions and update pinned balance automatically.",
-        "• I also keep a per-chat transaction history in D1.",
-        "",
-        "*Commands*",
-        "`/start` Initialize and pin balance",
-        "`/app` Get your Chat ID and login OTP",
-        "`/setkey <key>` Save your Groq API key",
-        "`/removekey` Remove your saved Groq API key",
-        "`/keystatus` Check if your key is set",
-        "`/balance` Show current balance",
-        "`/transactions` Show recent transactions",
-        "`/clear` Wipe all your transaction data"
-      ].join("\n"),
-      {
-        parse_mode: "Markdown",
-        reply_markup: getChatKeyboard()
-      }
-    )
-  }
+    await ctx.api.sendMessage(chatId, msg.help(), {
+      parse_mode: "Markdown",
+      reply_markup: getChatKeyboard(),
+    });
+  };
 
   const sendRecentTransactions = async (ctx: BotContext, chatId: number) => {
-    const controller = createBotController(ctx.env)
-    const transactions = await controller.listTransactions(chatId, 10)
+    if (!(await requireLinked(ctx))) return;
 
-    if (!transactions.length) {
-      await ctx.api.sendMessage(chatId, "📭 No transactions recorded yet.", {
-        reply_markup: getChatKeyboard()
-      })
-      return
+    const { items } = await ctx.caller.transactions.list({ limit: 10 });
+
+    if (!items.length) {
+      await ctx.api.sendMessage(chatId, msg.noTransactions(), {
+        reply_markup: getChatKeyboard(),
+      });
+      return;
     }
 
-    const lines = transactions.map((tx, index) => {
-      const sign = tx.type === "Expense" ? "-" : "+"
-      const note = tx.note ? ` • ${tx.note}` : ""
-      return `${index + 1}. ${sign}${formatMoney(tx.amount)}${note}`
-    })
-
-    await ctx.api.sendMessage(chatId, `📒 *Recent Transactions*\n\n${lines.join("\n")}`, {
+    await ctx.api.sendMessage(chatId, msg.recentTransactions(items), {
       parse_mode: "Markdown",
-      reply_markup: getChatKeyboard()
-    })
-  }
+      reply_markup: getChatKeyboard(),
+    });
+  };
 
   bot.command("start", async (ctx) => {
-    const chatId = ctx.chat.id
-    const user = ctx.from
-    if (!user) return
+    if (!(await requireLinked(ctx))) return;
 
     try {
-      const controller = createBotController(ctx.env)
+      await ctx.caller.ledger.refreshBalance();
+      const status = await ctx.caller.settings.getGroqStatus();
 
-      await controller.registerUser({
-        id: user.id,
-        username: user.username,
-        first_name: user.first_name,
-        last_name: user.last_name
-      })
+      await ctx.reply(msg.started(), {
+        parse_mode: "Markdown",
+        reply_markup: getChatKeyboard(),
+      });
 
-      const currentBalance = await controller.refreshBalance(chatId)
-      const existingKey = await controller.getGroqKey(user.id)
-
-      await ctx.reply(
-        `✅ Budget tracking is active. I pinned the current balance at Rs. ${currentBalance}.\n\n🌐 Web app: open the deployed domain, enter chat ID \`${chatId}\`, and use /app to get your OTP.`,
-        {
-          parse_mode: "Markdown",
-          reply_markup: getChatKeyboard()
-        }
-      )
-
-      if (!existingKey) {
-        await ctx.reply(getMissingKeyWarning(), { parse_mode: "Markdown" })
-      } else {
-        await ctx.reply("🔐 Groq API key is already set for your account.")
+      if (!status.hasKey) {
+        await ctx.reply(msg.missingKey(), { parse_mode: "Markdown" });
       }
     } catch (e) {
-      console.error("[start-balance-error]", e)
-      await ctx.reply("Failed to initialize. Please try /start again.")
+      console.error("[start-balance-error]", e);
+      await ctx.reply(msg.startError());
     }
-  })
+  });
+
+  bot.command("link", async (ctx) => {
+    const { code, expiresInSeconds } = await ctx.caller.telegram.requestLinkCode();
+    await ctx.reply(msg.linkCode(code, expiresInSeconds, appUrl(ctx)), {
+      parse_mode: "Markdown",
+      link_preview_options: { is_disabled: true },
+    });
+  });
 
   bot.command("app", async (ctx) => {
-    const chatId = ctx.chat.id
-    const username = ctx.from?.username
-    const webappUrl = ctx.env.WEBHOOK_URL ? ctx.env.WEBHOOK_URL.replace(/\/$/, "") : null
-
-    let message = `📱 *Web App Access*\n\n`
-
-    if (username) {
-      message += `Your Username: \`@${username}\`\n`
-    } else {
-      message += `Your Chat ID: \`${chatId}\`\n`
-    }
-
-    message += "\n"
-
-    if (webappUrl) {
-      message += `🔗 [Open Dashboard](${webappUrl}/app)\n\n`
-    }
-
-    message += `1️⃣ Open the dashboard\n2️⃣ Enter your ${username ? "Username" : "Chat ID"}\n3️⃣ Click "Request OTP"\n4️⃣ I will send you a login code here!`
-
-    await ctx.reply(message, {
+    await ctx.reply(msg.appLink(appUrl(ctx)), {
       parse_mode: "Markdown",
-      link_preview_options: { is_disabled: true }
-    })
-  })
+      link_preview_options: { is_disabled: true },
+    });
+  });
 
   bot.command("setkey", async (ctx) => {
-    const userId = ctx.from?.id
-    if (!userId) return
+    if (!(await requireLinked(ctx))) return;
 
-    const apiKey = ctx.match?.trim()
-
+    const apiKey = ctx.match?.trim();
     if (!apiKey) {
-      await ctx.reply("Usage: /setkey <your_groq_api_key>")
-      return
+      await ctx.reply(msg.setKeyUsage(), { parse_mode: "Markdown" });
+      return;
     }
 
-    const controller = createBotController(ctx.env)
-    await controller.setGroqKey(userId, apiKey)
-    await ctx.reply("✅ Your Groq API key has been saved.")
-  })
+    await ctx.caller.settings.setGroqKey({ key: apiKey });
+    await ctx.reply(msg.keySaved());
+  });
 
   bot.command("removekey", async (ctx) => {
-    const userId = ctx.from?.id
-    if (!userId) return
-
-    const controller = createBotController(ctx.env)
-    await controller.removeGroqKey(userId)
-    await ctx.reply("🗑️ Your Groq API key has been removed.")
-  })
+    if (!(await requireLinked(ctx))) return;
+    await ctx.caller.settings.removeGroqKey();
+    await ctx.reply(msg.keyRemoved());
+  });
 
   bot.command("keystatus", async (ctx) => {
-    const userId = ctx.from?.id
-    if (!userId) return
+    if (!(await requireLinked(ctx))) return;
+    const status = await ctx.caller.settings.getGroqStatus();
+    await ctx.reply(msg.keyStatus(status.hasKey), { parse_mode: "Markdown" });
+  });
 
-    const controller = createBotController(ctx.env)
-    const key = await controller.getGroqKey(userId)
-    await ctx.reply(key ? "✅ Groq API key is set." : "❌ Groq API key is not set.")
-  })
-
-  bot.command("help", async (ctx) => sendHelp(ctx, ctx.chat.id))
-  
   bot.command("balance", async (ctx) => {
-    const controller = createBotController(ctx.env)
-    await controller.refreshBalance(ctx.chat.id)
-  })
+    if (!(await requireLinked(ctx))) return;
+    await ctx.caller.ledger.refreshBalance();
+  });
 
-  bot.command("transactions", async (ctx) => sendRecentTransactions(ctx, ctx.chat.id))
+  bot.command("transactions", async (ctx) =>
+    sendRecentTransactions(ctx, ctx.chat.id),
+  );
 
-  bot.hears(/^💰\s*Balance$/i, async (ctx) => {
-    const controller = createBotController(ctx.env)
-    await controller.refreshBalance(ctx.chat.id)
-  })
-  
-  bot.hears(/^📒\s*Transactions$/i, async (ctx) => sendRecentTransactions(ctx, ctx.chat.id))
-  bot.hears(/^ℹ️\s*Help$/i, async (ctx) => sendHelp(ctx, ctx.chat.id))
-}
+  bot.command("help", async (ctx) => sendHelp(ctx, ctx.chat.id));
+
+  bot.hears(BUTTON_BALANCE_RE, async (ctx) => {
+    if (!(await requireLinked(ctx))) return;
+    await ctx.caller.ledger.refreshBalance();
+  });
+
+  bot.hears(BUTTON_TRANSACTIONS_RE, async (ctx) =>
+    sendRecentTransactions(ctx, ctx.chat.id),
+  );
+  bot.hears(BUTTON_HELP_RE, async (ctx) => sendHelp(ctx, ctx.chat.id));
+};

@@ -12,16 +12,17 @@ export const createAiService = (options: { model: string }) => {
       log.ai.debug("ai.extractTransactions.prompt", message)
 
       const { text } = await generateText({
-        model: groq(options.model) as any,
+        model: groq(options.model),
         system: `Extract every monetary transaction mentioned in the message.
 
 Return ONLY valid JSON with this exact shape:
-{"items":[{"amount":123,"type":"Expense","note":"coffee"}]}
+{"items":[{"amount":12.50,"type":"Expense","note":"coffee","category":"Food"}]}
 
 Rules:
-- amount must be an integer (no decimals, strip currency symbols).
+- amount must be a positive number; decimals are allowed (strip currency symbols).
 - type must be either "Expense" or "Income".
 - note must describe the specific transaction amount it appears next to or on the same line as.
+- category is OPTIONAL: a short label like "Food", "Transport", "Shopping", "Bills", "Salary". Omit if unsure.
 - Associate descriptive text with the closest relevant amount.
 - If no clear note is associated, use an empty string.
 - If no clear amounts are found, return: {"items":[]}
