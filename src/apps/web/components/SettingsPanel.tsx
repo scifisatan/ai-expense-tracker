@@ -1,6 +1,12 @@
 import { useState } from "react"
 import { toast } from "sonner"
-import { Trash2 } from "lucide-react"
+import {
+  MessageCircle,
+  Settings as SettingsIcon,
+  Sparkles,
+  Tags,
+  Trash2,
+} from "lucide-react"
 import { trpc } from "@web/trpc"
 import type { TransactionType } from "@/shared/types"
 import {
@@ -14,7 +20,12 @@ import { Button } from "@web/components/ui/button"
 import { Input } from "@web/components/ui/input"
 import { Label } from "@web/components/ui/label"
 import { Badge } from "@web/components/ui/badge"
-import { Separator } from "@web/components/ui/separator"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@web/components/ui/tabs"
 import {
   Select,
   SelectContent,
@@ -120,9 +131,31 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-6 px-6 py-6">
-          {/* Default currency */}
-          <section className="flex flex-col gap-2">
+        <Tabs defaultValue="general" className="gap-0 px-6 py-6">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="general">
+              <SettingsIcon />
+              <span className="hidden sm:inline">General</span>
+            </TabsTrigger>
+            <TabsTrigger value="ai">
+              <Sparkles />
+              <span className="hidden sm:inline">AI</span>
+            </TabsTrigger>
+            <TabsTrigger value="telegram">
+              <MessageCircle />
+              <span className="hidden sm:inline">Telegram</span>
+            </TabsTrigger>
+            <TabsTrigger value="categories">
+              <Tags />
+              <span className="hidden sm:inline">Categories</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* General */}
+          <TabsContent
+            value="general"
+            className="mt-6 flex flex-col gap-2"
+          >
             <Label htmlFor="settings-currency">Default currency</Label>
             <Select
               value={settings?.defaultCurrency ?? "USD"}
@@ -139,12 +172,13 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
                 ))}
               </SelectContent>
             </Select>
-          </section>
+            <p className="text-xs text-muted-foreground">
+              Used as the default for new transactions.
+            </p>
+          </TabsContent>
 
-          <Separator />
-
-          {/* Groq key */}
-          <section className="flex flex-col gap-2">
+          {/* AI */}
+          <TabsContent value="ai" className="mt-6 flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <Label htmlFor="settings-groq">Groq API key</Label>
               <Badge variant={settings?.hasKey ? "secondary" : "outline"}>
@@ -181,12 +215,13 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
             <p className="text-xs text-muted-foreground">
               Required for natural-language entry (web and Telegram).
             </p>
-          </section>
+          </TabsContent>
 
-          <Separator />
-
-          {/* Telegram connect */}
-          <section className="flex flex-col gap-2">
+          {/* Telegram */}
+          <TabsContent
+            value="telegram"
+            className="mt-6 flex flex-col gap-2"
+          >
             <Label htmlFor="settings-code">Connect Telegram</Label>
             <p className="text-xs text-muted-foreground">
               Send{" "}
@@ -212,7 +247,7 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
               </Button>
             </div>
 
-            {links.length > 0 && (
+            {links.length > 0 ? (
               <ul className="mt-2 flex flex-col gap-1">
                 {links.map((link) => (
                   <li
@@ -236,13 +271,21 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
                   </li>
                 ))}
               </ul>
+            ) : (
+              <div className="mt-2 flex flex-col items-center gap-2 rounded-md border border-dashed px-6 py-8 text-center">
+                <MessageCircle className="size-6 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  No chats connected yet
+                </p>
+              </div>
             )}
-          </section>
-
-          <Separator />
+          </TabsContent>
 
           {/* Categories */}
-          <section className="flex flex-col gap-2">
+          <TabsContent
+            value="categories"
+            className="mt-6 flex flex-col gap-2"
+          >
             <Label htmlFor="settings-cat">Categories</Label>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
@@ -277,7 +320,7 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
               </div>
             </div>
 
-            {categories.length > 0 && (
+            {categories.length > 0 ? (
               <ul className="mt-2 flex flex-col gap-1">
                 {categories.map((cat) => (
                   <li
@@ -316,9 +359,14 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
                   </li>
                 ))}
               </ul>
+            ) : (
+              <div className="mt-2 flex flex-col items-center gap-2 rounded-md border border-dashed px-6 py-8 text-center">
+                <Tags className="size-6 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">No categories yet</p>
+              </div>
             )}
-          </section>
-        </div>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   )
