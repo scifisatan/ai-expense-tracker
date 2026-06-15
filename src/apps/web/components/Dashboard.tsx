@@ -100,6 +100,7 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
 
         <CommandBar
           categories={categories}
+          currency={currency}
           onCreate={createTransaction}
           onAddFromText={addFromText}
         />
@@ -107,6 +108,7 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
         <ActivityFeed
           transactions={transactions}
           categories={categories}
+          currency={currency}
           isLoading={isLoading}
           onUpdate={updateTransaction}
           onDelete={(id) => deleteTransactions([id])}
