@@ -119,7 +119,7 @@ npm run format             # oxfmt . --write
 
 ```bash
 npm run build
-npm run deploy             # wrangler deploy
+npm run deploy             # builds, then deploys
 ```
 
 Then set the Telegram webhook:

@@ -174,8 +174,19 @@ npm run db:migrate:remote
 
 ```bash
 npm run build      # vite build
-npm run deploy     # wrangler deploy
+npm run deploy     # builds, then deploys through Wrangler's Vite-generated redirect
 ```
+
+The Vite/Cloudflare build intentionally writes two output folders:
+
+- `dist/client` contains the browser assets generated from the SSR `<Script>` and `<Link>`
+  entries.
+- `dist/telegram_budget_bot` contains the Worker bundle and generated Wrangler config.
+
+After `vite build`, the Cloudflare Vite plugin writes `.wrangler/deploy/config.json`, which
+redirects root `wrangler deploy` to the generated config in `dist/telegram_budget_bot`. That
+generated config points Wrangler at `../client`, so the dashboard assets are uploaded with
+the Worker.
 
 ### Custom domain (optional)
 

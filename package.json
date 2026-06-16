@@ -9,7 +9,7 @@
   "main": "src/index.ts",
   "scripts": {
     "dev": "vite",
-    "deploy": "wrangler deploy",
+    "deploy": "vite build && wrangler deploy",
     "cf-typegen": "wrangler types",
     "db:migrate:local": "wrangler d1 migrations apply telegram_budget_bot --local",
     "db:migrate:remote": "wrangler d1 migrations apply telegram_budget_bot --remote",
@@ -21,7 +21,6 @@
   },
   "dependencies": {
     "@ai-sdk/groq": "^2.0.41",
-    "@ai-sdk/openai-compatible": "^1.0.40",
     "@cloudflare/vite-plugin": "^1.36.0",
     "@hono/trpc-server": "^0.4.2",
     "@tailwindcss/vite": "^4.3.1",
@@ -30,7 +29,6 @@
     "@trpc/react-query": "^11.17.0",
     "@trpc/server": "^11.17.0",
     "ai": "^5.0.202",
-    "ai-gateway-provider": "2.3.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
@@ -58,6 +56,5 @@
     "typescript": "^5.9.3",
     "vite": "^8.0.10",
     "wrangler": "^4.62.0"
-  },
-  "packageManager": "pnpm@11.0.9"
+  }
 }

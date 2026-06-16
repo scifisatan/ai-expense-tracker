@@ -39,7 +39,6 @@ export const ledgerRouter = t.router({
       const ai = createAiService({
         model: ctx.env.AI_MODEL || DEFAULT_AI_MODEL,
         ai: ctx.env.AI,
-        gateway: ctx.env.AI_GATEWAY ?? "",
         groqApiKey: ctx.env.GROQ_API_KEY ?? "",
       });
 
