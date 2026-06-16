@@ -73,15 +73,8 @@ botRoutes.post("/*", async (c) => {
 
     return c.json({ ok: true });
   } catch (error) {
-    log.bot.error("Failed to process update");
-    return c.json(
-      {
-        ok: false,
-        error: "Failed to process update",
-        logs: error,
-      },
-      500,
-    );
+    log.bot.error("Failed to process update", error);
+    return c.json({ ok: false, error: "Failed to process update" }, 500);
   }
 });
 

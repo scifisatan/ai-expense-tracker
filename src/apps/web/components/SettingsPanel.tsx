@@ -43,32 +43,15 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
   const linksQuery = trpc.telegram.listLinks.useQuery()
   const categoriesQuery = trpc.categories.list.useQuery()
 
-  const setKey = trpc.settings.setGroqKey.useMutation()
-  const removeKey = trpc.settings.removeGroqKey.useMutation()
   const setCurrency = trpc.settings.setDefaultCurrency.useMutation()
   const confirmLink = trpc.telegram.confirmLink.useMutation()
   const unlink = trpc.telegram.unlink.useMutation()
   const createCategory = trpc.categories.create.useMutation()
   const deleteCategory = trpc.categories.delete.useMutation()
 
-  const [groqKey, setGroqKey] = useState("")
   const [code, setCode] = useState("")
   const [newCatName, setNewCatName] = useState("")
   const [newCatType, setNewCatType] = useState<TransactionType>("Expense")
-
-  const saveKey = async () => {
-    if (!groqKey.trim()) return
-    await setKey.mutateAsync({ key: groqKey.trim() })
-    setGroqKey("")
-    await settingsQuery.refetch()
-    toast.success("Saved")
-  }
-
-  const clearKey = async () => {
-    await removeKey.mutateAsync()
-    await settingsQuery.refetch()
-    toast.success("Groq key removed")
-  }
 
   const saveCurrency = async (currency: string) => {
     await setCurrency.mutateAsync({ currency })
@@ -177,45 +160,6 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
             </p>
           </TabsContent>
 
-          {/* AI */}
-          <TabsContent value="ai" className="mt-6 flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="settings-groq">Groq API key</Label>
-              <Badge variant={settings?.hasKey ? "secondary" : "outline"}>
-                {settings?.hasKey ? "Set" : "Not set"}
-              </Badge>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input
-                id="settings-groq"
-                type="password"
-                placeholder={settings?.hasKey ? "Replace key…" : "gsk_…"}
-                value={groqKey}
-                onChange={(e) => setGroqKey(e.target.value)}
-                className="flex-1"
-              />
-              <div className="flex gap-2">
-                <Button
-                  onClick={saveKey}
-                  disabled={!groqKey.trim() || setKey.isPending}
-                >
-                  Save
-                </Button>
-                {settings?.hasKey && (
-                  <Button
-                    variant="outline"
-                    onClick={clearKey}
-                    disabled={removeKey.isPending}
-                  >
-                    Remove
-                  </Button>
-                )}
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Required for natural-language entry (web and Telegram).
-            </p>
-          </TabsContent>
 
           {/* Telegram */}
           <TabsContent

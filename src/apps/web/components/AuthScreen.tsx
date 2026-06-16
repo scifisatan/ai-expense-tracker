@@ -51,8 +51,8 @@ const features: Feature[] = [
   },
   {
     icon: Lock,
-    title: "Your data, your key",
-    body: "Bring your own Groq key. Your money stays yours, not a product.",
+    title: "Yours, private by default",
+    body: "No setup, no API keys. Your money stays yours, not a product.",
   },
 ]
 

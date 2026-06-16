@@ -20,17 +20,19 @@ export const registerMessageHandlers = (bot: Bot<BotContext>) => {
       return
     }
 
+    let processingMsg: Awaited<ReturnType<typeof ctx.reply>> | undefined
+
     try {
-      const processingMsg = await ctx.reply("⏳ _One sec, reading your message..._", {
+      processingMsg = await ctx.reply("⏳ _One sec, reading your message..._", {
         parse_mode: "Markdown",
       })
 
       await ctx.api.sendChatAction(chatId, "typing")
       const result = await ctx.caller.ledger.ingestText({ text })
 
-      if (result.reason === "NO_KEY") {
+      if (result.reason === "RATE_LIMITED") {
         await ctx.api.deleteMessage(chatId, processingMsg.message_id).catch(() => {})
-        await ctx.reply(msg.missingKey(), { parse_mode: "Markdown" })
+        await ctx.reply(msg.rateLimited(), { parse_mode: "Markdown" })
         return
       }
 
@@ -47,6 +49,9 @@ export const registerMessageHandlers = (bot: Bot<BotContext>) => {
       )
     } catch (error) {
       log.bot.error("[extract-error]", error)
+      if (processingMsg) {
+        await ctx.api.deleteMessage(chatId, processingMsg.message_id).catch(() => {})
+      }
       await ctx.reply(msg.genericError())
     }
   })

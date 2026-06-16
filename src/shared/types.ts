@@ -61,7 +61,6 @@ export const categoryDeleteInputSchema = z.object({
 
 // Settings
 export const settingsUpdateInputSchema = z.object({
-  groqApiKey: z.string().nullable().optional(),
   defaultCurrency: z.string().min(3).max(3).optional()
 })
 

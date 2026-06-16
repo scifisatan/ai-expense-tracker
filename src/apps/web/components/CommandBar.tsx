@@ -81,7 +81,7 @@ const CommandBar = ({ categories, currency, onCreate, onAddFromText }: Props) =>
         </div>
       </div>
       <p className="mt-2 px-1 text-xs text-muted-foreground">
-        Parsed with your Groq key — set it in Settings. Same magic as the Telegram bot.
+        Just type it in plain language — same magic as the Telegram bot.
       </p>
 
       <TransactionDialog

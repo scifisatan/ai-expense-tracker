@@ -178,41 +178,16 @@ export const msg = {
       "`/app` — Open your web dashboard",
       "`/balance` — Show your current balance",
       "`/transactions` — See recent activity",
-      "`/setkey <key>` — Save your Groq API key",
-      "`/removekey` — Remove your saved key",
-      "`/keystatus` — Check if your key is set",
     ].join("\n"),
 
-  // Groq key onboarding / status copy.
-  missingKey: (): string =>
-    [
-      "🔑 Almost there — I just need a Groq API key to read your messages.",
-      "",
-      "Add it in the dashboard settings, or right here with:",
-      "`/setkey <your_groq_api_key>`",
-      "",
-      "For example:",
-      "`/setkey gsk_xxxxx`",
-    ].join("\n"),
-
-  setKeyUsage: (): string =>
-    "To save your key, send it like this:\n`/setkey <your_groq_api_key>`",
-
-  keySaved: (): string =>
-    "✅ Your Groq API key is saved — you're ready to roll!",
-
-  keyRemoved: (): string =>
-    "🗑️ Done — your Groq API key has been removed.",
-
-  keyStatus: (hasKey: boolean): string =>
-    hasKey
-      ? "✅ Your Groq API key is set — all good!"
-      : "🔑 No Groq API key yet. Add one with `/setkey <your_groq_api_key>` whenever you're ready.",
+  // Shown when the account hits its daily AI extraction limit.
+  rateLimited: (): string =>
+    "🚦 You've hit today's limit for reading messages. It resets tomorrow — or add entries manually in the dashboard any time.",
 
   // Generic fallbacks.
   startError: (): string =>
     "😕 Something hiccuped while getting set up. Mind trying /start once more?",
 
   genericError: (): string =>
-    "😕 I couldn't process that one. Double-check your Groq API key and give it another go.",
+    "😕 I couldn't process that one. Mind giving it another go?",
 }

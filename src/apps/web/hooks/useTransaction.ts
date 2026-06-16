@@ -57,8 +57,8 @@ export function useTransaction(onMutationSuccess?: () => void) {
   const addFromText = async (text: string) => {
     try {
       const result = await ingestMutation.mutateAsync({ text })
-      if (result.reason === "NO_KEY") {
-        flash("Set your Groq API key in Settings first.", 3500)
+      if (result.reason === "RATE_LIMITED") {
+        flash("Daily AI limit reached — try again tomorrow or add entries manually.", 4000)
         return false
       }
       if (!result.items.length) {
@@ -69,7 +69,7 @@ export function useTransaction(onMutationSuccess?: () => void) {
       await loadData()
       return true
     } catch {
-      flash("Failed to parse text.", 3000)
+      flash("AI couldn't process that right now — please try again.", 3500)
       return false
     }
   }

@@ -2,8 +2,12 @@ import { z } from "zod";
 import { t, protectedProcedure } from "../trpc";
 import { createAiService } from "@/services/ai";
 import { publishBalance } from "@api/lib/ledger";
+import { consumeAiQuota } from "@api/lib/rate-limit";
 import { toMinor } from "@/shared/money";
 import type { Category } from "@/db/schema";
+
+const DEFAULT_AI_DAILY_LIMIT = 50;
+const DEFAULT_AI_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
 
 const resolveCategoryId = (
   categories: Category[],
@@ -26,16 +30,20 @@ export const ledgerRouter = t.router({
       const account = await ctx.repos.accounts.findById(ctx.accountId);
       const currency = account?.defaultCurrency ?? "USD";
 
-      const groqKey = await ctx.repos.settings.getGroqApiKey(ctx.accountId);
-      if (!groqKey) {
-        return { items: [], net: 0, newBalance: null, currency, reason: "NO_KEY" as const };
+      const dailyLimit = Number(ctx.env.AI_DAILY_LIMIT ?? DEFAULT_AI_DAILY_LIMIT);
+      const quota = await consumeAiQuota(ctx.env.BOT_INFO, ctx.accountId, dailyLimit);
+      if (!quota.allowed) {
+        return { items: [], net: 0, newBalance: null, currency, reason: "RATE_LIMITED" as const };
       }
 
       const ai = createAiService({
-        model: ctx.env.AI_MODEL || "meta-llama/llama-4-scout-17b-16e-instruct",
+        model: ctx.env.AI_MODEL || DEFAULT_AI_MODEL,
+        ai: ctx.env.AI,
+        gateway: ctx.env.AI_GATEWAY ?? "",
+        groqApiKey: ctx.env.GROQ_API_KEY ?? "",
       });
 
-      const extracted = await ai.extractTransactions(input.text, groqKey);
+      const extracted = await ai.extractTransactions(input.text);
       if (!extracted.items.length) {
         return { items: [], net: 0, newBalance: null, currency, reason: "NO_ITEMS" as const };
       }

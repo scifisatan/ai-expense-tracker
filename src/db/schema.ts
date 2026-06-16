@@ -76,7 +76,6 @@ export const transactions = sqliteTable('transactions', {
 
 export const accountSettings = sqliteTable('account_settings', {
   accountId: text('account_id').primaryKey().references(() => accounts.id),
-  groqApiKey: text('groq_api_key'),
   updatedAt: text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 

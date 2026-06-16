@@ -52,16 +52,11 @@ export const registerCommandHandlers = (bot: Bot<BotContext>) => {
 
     try {
       await ctx.caller.ledger.refreshBalance();
-      const status = await ctx.caller.settings.getGroqStatus();
 
       await ctx.reply(msg.started(), {
         parse_mode: "Markdown",
         reply_markup: getChatKeyboard(),
       });
-
-      if (!status.hasKey) {
-        await ctx.reply(msg.missingKey(), { parse_mode: "Markdown" });
-      }
     } catch (e) {
       console.error("[start-balance-error]", e);
       await ctx.reply(msg.startError());
@@ -81,31 +76,6 @@ export const registerCommandHandlers = (bot: Bot<BotContext>) => {
       parse_mode: "Markdown",
       link_preview_options: { is_disabled: true },
     });
-  });
-
-  bot.command("setkey", async (ctx) => {
-    if (!(await requireLinked(ctx))) return;
-
-    const apiKey = ctx.match?.trim();
-    if (!apiKey) {
-      await ctx.reply(msg.setKeyUsage(), { parse_mode: "Markdown" });
-      return;
-    }
-
-    await ctx.caller.settings.setGroqKey({ key: apiKey });
-    await ctx.reply(msg.keySaved());
-  });
-
-  bot.command("removekey", async (ctx) => {
-    if (!(await requireLinked(ctx))) return;
-    await ctx.caller.settings.removeGroqKey();
-    await ctx.reply(msg.keyRemoved());
-  });
-
-  bot.command("keystatus", async (ctx) => {
-    if (!(await requireLinked(ctx))) return;
-    const status = await ctx.caller.settings.getGroqStatus();
-    await ctx.reply(msg.keyStatus(status.hasKey), { parse_mode: "Markdown" });
   });
 
   bot.command("balance", async (ctx) => {

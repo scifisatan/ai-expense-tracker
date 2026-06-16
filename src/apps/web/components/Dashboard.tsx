@@ -36,7 +36,7 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
   // Surface the hook's status string as a toast (success unless it reads like a failure).
   useEffect(() => {
     if (!status) return
-    if (/fail|error|no transactions|set your groq/i.test(status)) toast.error(status)
+    if (/fail|error|no transactions|couldn't|limit reached/i.test(status)) toast.error(status)
     else toast.success(status)
   }, [status])
 
