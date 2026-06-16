@@ -13,7 +13,7 @@ at the deployed Worker.
 
 ## 1. Prerequisites
 
-- A **Cloudflare account** (Workers + D1 + KV + Workers AI are all on the free tier).
+- A **Cloudflare account** (Workers + D1 + KV are all on the free tier).
 - **Node.js** 20+ and **pnpm** (`npm i -g pnpm`). npm also works.
 - **Wrangler** is installed as a dev dependency, so use it via `npx wrangler …` (or
   `pnpm exec wrangler …`). Authenticate once:
@@ -57,18 +57,6 @@ npx wrangler kv namespace create BOT_INFO
 ```
 
 Put the returned `id` into `wrangler.jsonc` under `kv_namespaces[0].id` (binding `BOT_INFO`).
-
-### Workers AI
-
-No provisioning needed — the `ai` binding (`AI`) in `wrangler.jsonc` enables it. It is used to
-route Groq calls through a Cloudflare AI Gateway when `AI_GATEWAY` is set.
-
-### (Optional) AI Gateway
-
-For observability, caching, and gateway-wide limits on AI calls:
-
-1. In the Cloudflare dashboard → **AI** → **AI Gateway**, create a gateway and note its name.
-2. Set the `AI_GATEWAY` var (step 5) to that name. Leave it as `""` to call Groq directly.
 
 ---
 
@@ -120,7 +108,6 @@ Non-sensitive config lives in the `vars` block of `wrangler.jsonc`:
 | ---------------- | ---------------------------------------------------- | ----------------------------------------------- |
 | `APP_URL`        | Base URL; builds the OAuth redirect URI             | `https://budget.example.com`                    |
 | `AI_MODEL`       | Groq model id                                        | `meta-llama/llama-4-scout-17b-16e-instruct`     |
-| `AI_GATEWAY`     | Cloudflare AI Gateway name (`""` = call Groq direct) | `""`                                            |
 | `AI_DAILY_LIMIT` | Per-account daily AI extraction cap (`0` disables)   | `50`                                            |
 
 Also set the custom domain under `routes` if you serve on your own domain (see step 7).

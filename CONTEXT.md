@@ -18,8 +18,7 @@ flows, and the gotchas. For setup/commands see `README.md`.
   `spent 12.50 on coffee` are parsed and recorded against that account, and the bot keeps a
   pinned balance message up to date.
 - Natural-language parsing uses **Groq via the Vercel AI SDK**, with a **single app-level
-  API key**. Calls can optionally be routed through a **Cloudflare AI Gateway** for
-  observability/limits, and each account has a **per-day extraction cap** for fairness.
+  API key** and per-account extraction rate limits for fairness.
 
 ---
 
@@ -52,7 +51,7 @@ calls and format replies. They contain no DB access or business logic.
 ```txt
 src/
   apps/
-    env.ts            CloudflareBindings type (DB, AI, KV, secrets, vars)
+    env.ts            CloudflareBindings type (DB, RateLimit, KV, secrets, vars)
     api/
       index.ts        HTTP bridge: builds tRPC context, mounts OAuth routes
       router.ts       assembles sub-routers
@@ -67,7 +66,7 @@ src/
     web/              React dashboard (components, hooks, trpc client)
   db/                 Drizzle schema + D1 client factory
   shared/             Zod contracts (types.ts), money helpers (money.ts)
-  services/           ai.ts (Groq extraction via Vercel AI SDK + optional AI Gateway)
+  services/           ai.ts (Groq extraction via Vercel AI SDK)
   utils/              logger, cookies, constants
 migrations/           D1 SQL migrations (0001–0006)
 ```
@@ -128,7 +127,6 @@ Unlinked chats are guided to connect instead of silently tracked.
 text → ledger.ingestText (protected, account-scoped)
      → consume per-account daily AI quota (KV); over limit → reason:"RATE_LIMITED"
      → Groq extraction via Vercel AI SDK (generateObject, Zod schema)
-        · routed through Cloudflare AI Gateway when AI_GATEWAY is set, else direct
      → items: { amount(decimal), type, note, category? }; empty → reason:"NO_ITEMS"
      → convert amounts to minor units; resolve category hints to category_id
      → insert transactions (source = "telegram" for bot, "web" for web)
@@ -148,10 +146,7 @@ balance message to each chat. No-op if the account has no linked chat or no bot 
 
 ## 7. AI extraction & rate limiting
 
-- **`src/services/ai.ts`** — `createAiService` builds a Groq model via `@ai-sdk/groq` and
-  `generateObject` (validated against `transactionsSchema`). When `AI_GATEWAY` is set, the
-  model is wrapped with `ai-gateway-provider` using the Workers `AI` binding; otherwise Groq
-  is called directly. A single app-level `GROQ_API_KEY` is used for all accounts.
+- **`src/services/ai.ts`** — `createAiService` builds a Groq model via `@ai-sdk/groq`
 - **`src/apps/api/lib/rate-limit.ts`** — `consumeAiQuota` enforces a per-account daily cap
   (`AI_DAILY_LIMIT`, default 50). Counters are stored in the `BOT_INFO` KV namespace, keyed
   `ai-ratelimit:<accountId>:<YYYY-MM-DD>` with a ~1-day TTL. Best-effort (KV is eventually

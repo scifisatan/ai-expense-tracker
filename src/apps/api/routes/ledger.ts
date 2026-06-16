@@ -6,7 +6,6 @@ import { consumeAiQuota } from "@api/lib/rate-limit";
 import { toMinor } from "@/shared/money";
 import type { Category } from "@/db/schema";
 
-const DEFAULT_AI_DAILY_LIMIT = 50;
 const DEFAULT_AI_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
 
 const resolveCategoryId = (
@@ -30,15 +29,13 @@ export const ledgerRouter = t.router({
       const account = await ctx.repos.accounts.findById(ctx.accountId);
       const currency = account?.defaultCurrency ?? "USD";
 
-      const dailyLimit = Number(ctx.env.AI_DAILY_LIMIT ?? DEFAULT_AI_DAILY_LIMIT);
-      const quota = await consumeAiQuota(ctx.env.BOT_INFO, ctx.accountId, dailyLimit);
+      const quota = await consumeAiQuota(ctx.env.AI_QUOTA, ctx.accountId);
       if (!quota.allowed) {
         return { items: [], net: 0, newBalance: null, currency, reason: "RATE_LIMITED" as const };
       }
 
       const ai = createAiService({
         model: ctx.env.AI_MODEL || DEFAULT_AI_MODEL,
-        ai: ctx.env.AI,
         groqApiKey: ctx.env.GROQ_API_KEY ?? "",
       });
 

@@ -12,8 +12,8 @@ Stack:
 - **grammY** for the Telegram bot
 - **tRPC** as the single business-logic surface (shared by web + bot)
 - **Drizzle ORM + D1** for persistence
-- **Vercel AI SDK + Groq** for natural-language extraction, optionally routed through a
-  **Cloudflare AI Gateway** (single app-level key, with per-account daily limits)
+- **Vercel AI SDK + Groq** for natural-language extraction with a single app-level key and
+  per-account rate limits
 - **React 19 + Vite + Tailwind v4 + Radix UI** for the dashboard
 
 > For step-by-step configuration and deployment, see **[DEPLOY.md](./DEPLOY.md)**.
@@ -54,14 +54,12 @@ Configure in `wrangler.jsonc` and via `wrangler secret put` (or `.dev.vars` loca
 
 - `APP_URL` — base URL, used to build the OAuth redirect URI
 - `AI_MODEL` — Groq model id (default: `meta-llama/llama-4-scout-17b-16e-instruct`)
-- `AI_GATEWAY` — Cloudflare AI Gateway name; empty string calls Groq directly
 - `AI_DAILY_LIMIT` — per-account daily extraction cap (default: `50`)
 - `WEBHOOK_URL` (optional)
 
 **Bindings:**
 
 - `DB` — D1 database
-- `AI` — Workers AI binding (used to route through the AI Gateway)
 - `BOT_INFO` — KV namespace (serialized bot info + per-account AI rate-limit counters)
 
 ### Google OAuth setup

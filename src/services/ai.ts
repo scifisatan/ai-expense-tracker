@@ -20,7 +20,6 @@ Rules:
 
 export const createAiService = (options: {
   model: string
-  ai: Ai
   groqApiKey: string
 }) => {
   return {
