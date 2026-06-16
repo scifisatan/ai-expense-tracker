@@ -16,9 +16,6 @@
 			"database_id": "aafc7c03-08cd-47ab-a5cf-1185176d569c"
 		}
 	],
-	"ai": {
-		"binding": "AI"
-	},
 	"vars": {
 		"AI_MODEL": "meta-llama/llama-4-scout-17b-16e-instruct",
 		"AI_DAILY_LIMIT": "50",
