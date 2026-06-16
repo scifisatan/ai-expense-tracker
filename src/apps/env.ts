@@ -2,10 +2,18 @@ import type { Context } from "hono"
 
 export type CloudflareBindings = {
   BOT_INFO: KVNamespace
+  AI: Ai
   BOT_TOKEN?: string
   AI_MODEL?: string
+  AI_GATEWAY?: string
+  AI_DAILY_LIMIT?: string
+  GROQ_API_KEY?: string
   WEBHOOK_URL?: string
   DB: D1Database
+  SESSION_SECRET?: string
+  GOOGLE_CLIENT_ID?: string
+  GOOGLE_CLIENT_SECRET?: string
+  APP_URL?: string
 }
 
 export type AppEnv = {

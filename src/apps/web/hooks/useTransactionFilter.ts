@@ -31,7 +31,7 @@ export function useTransactionFilter(transactions: Transaction[]) {
       list = list.filter(
         (t) =>
           t.note?.toLowerCase().includes(q) ||
-          String(t.amount).includes(q) ||
+          String(t.amountMinor).includes(q) ||
           String(t.id).includes(q)
       )
     }

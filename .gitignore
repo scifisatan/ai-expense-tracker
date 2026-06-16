@@ -6,3 +6,5 @@ docs/
 dist/
 web/dist/
 .wrangler/
+# Claude Code worktrees/local
+.claude/

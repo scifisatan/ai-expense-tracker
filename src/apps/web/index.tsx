@@ -19,6 +19,13 @@ web.get("/", (c) => {
         <ViteClient />
         <Script src="/src/apps/web/client.tsx" />
         <Link href="/src/apps/web/styles.css" rel="stylesheet" />
+
+        {/* Set the theme before paint to avoid a light/dark flash. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("theme");var d=t==="dark"||((!t||t==="system")&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.classList.toggle("dark",d)}catch(e){}})()`
+          }}
+        />
       </head>
 
       <body>
