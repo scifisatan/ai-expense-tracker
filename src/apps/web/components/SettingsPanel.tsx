@@ -3,7 +3,6 @@ import { toast } from "sonner"
 import {
   MessageCircle,
   Settings as SettingsIcon,
-  Sparkles,
   Tags,
   Trash2,
 } from "lucide-react"
@@ -19,7 +18,6 @@ import {
 import { Button } from "@web/components/ui/button"
 import { Input } from "@web/components/ui/input"
 import { Label } from "@web/components/ui/label"
-import { Badge } from "@web/components/ui/badge"
 import {
   Tabs,
   TabsContent,
@@ -115,14 +113,10 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
         </DialogHeader>
 
         <Tabs defaultValue="general" className="gap-0 px-6 py-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="general">
               <SettingsIcon />
               <span className="hidden sm:inline">General</span>
-            </TabsTrigger>
-            <TabsTrigger value="ai">
-              <Sparkles />
-              <span className="hidden sm:inline">AI</span>
             </TabsTrigger>
             <TabsTrigger value="telegram">
               <MessageCircle />

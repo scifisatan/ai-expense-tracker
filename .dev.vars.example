@@ -1,9 +1,16 @@
-BOT_TOKEN=your-telegram-bot-token
-AI_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
-WEBHOOK_URL=your-application-url
+# Copy to .dev.vars for local development. In production these are set with
+# `wrangler secret put` (secrets) or live in wrangler.jsonc (vars).
 
-# Web account identity (Google OAuth) + session signing
+# --- Secrets ---
+BOT_TOKEN=your-telegram-bot-token
 SESSION_SECRET=generate-a-long-random-string
 GOOGLE_CLIENT_ID=your-google-oauth-client-id
 GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
+GROQ_API_KEY=your-groq-api-key
+
+# --- Vars (mirror wrangler.jsonc for local dev) ---
 APP_URL=http://localhost:3001
+AI_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
+AI_GATEWAY=
+AI_DAILY_LIMIT=50
+# WEBHOOK_URL=your-application-url
