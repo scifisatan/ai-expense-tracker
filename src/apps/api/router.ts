@@ -6,6 +6,7 @@ import { ledgerRouter } from "./routes/ledger";
 import { settingsRouter } from "./routes/settings";
 import { categoriesRouter } from "./routes/categories";
 import { telegramRouter } from "./routes/telegram";
+import { budgetsRouter } from "./routes/budgets";
 
 export const router = t.router({
   auth: authRouter,
@@ -15,6 +16,7 @@ export const router = t.router({
   settings: settingsRouter,
   categories: categoriesRouter,
   telegram: telegramRouter,
+  budgets: budgetsRouter,
 });
 
 export type APIRouter = typeof router;

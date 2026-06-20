@@ -1,6 +1,6 @@
 import type { AppDb } from "@/db/client"
 
-import { and, eq } from "drizzle-orm"
+import { and, eq, sql } from "drizzle-orm"
 import { accounts, categories } from "@/db/schema"
 import type { Account } from "@/db/schema"
 
@@ -63,6 +63,16 @@ export const createAccountsRepo = (db: AppDb) => ({
 
   setDefaultCurrency: (id: string, currency: string) =>
     db.update(accounts).set({ defaultCurrency: currency }).where(eq(accounts.id, id)),
+
+  setTimezone: (id: string, timezone: string) =>
+    db.update(accounts).set({ timezone }).where(eq(accounts.id, id)),
+
+  // Invalidate every outstanding session token for the account.
+  bumpTokenVersion: (id: string) =>
+    db
+      .update(accounts)
+      .set({ tokenVersion: sql`${accounts.tokenVersion} + 1` })
+      .where(eq(accounts.id, id)),
 })
 
 export type AccountsRepo = ReturnType<typeof createAccountsRepo>

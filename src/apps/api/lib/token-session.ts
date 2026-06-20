@@ -1,5 +1,8 @@
 export type SessionPayload = {
   accountId: string
+  // Snapshot of the account's tokenVersion at issuance. A mismatch against the
+  // current account value means the session was revoked ("log out everywhere").
+  tokenVersion: number
   exp: number
 }
 
@@ -43,9 +46,10 @@ const verifyToken = async <T>(secret: string, token: string): Promise<T | null> 
 }
 
 export const createTokenSession = (secret: string) => ({
-  async issueSession(accountId: string): Promise<string> {
+  async issueSession(accountId: string, tokenVersion = 0): Promise<string> {
     return signToken(secret, {
       accountId,
+      tokenVersion,
       exp: Date.now() + 7 * 24 * 60 * 60 * 1000
     })
   },

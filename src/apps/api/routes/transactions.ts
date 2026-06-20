@@ -7,7 +7,9 @@ import {
   transactionsUpdateInputSchema,
 } from "@/shared/types";
 import { publishBalance } from "@api/lib/ledger";
+import { checkBudgetAlerts } from "@api/lib/budgets";
 import { toMinor } from "@/shared/money";
+import { resolvePeriod } from "@/shared/datetime";
 
 const accountCurrency = async (ctx: { repos: { accounts: { findById: (id: string) => Promise<{ defaultCurrency: string } | undefined> } }; accountId: string }) => {
   const account = await ctx.repos.accounts.findById(ctx.accountId);
@@ -18,17 +20,32 @@ export const transactionsRouter = t.router({
   list: protectedProcedure
     .input(transactionsListInputSchema)
     .query(async ({ input, ctx }) => {
-      const items = await ctx.repos.transactions.listRecent(
-        ctx.accountId,
-        input.limit,
-      );
-      return { items };
+      // Period-scoped listing (keyset paginated by occurredAt); otherwise the most
+      // recent across all time.
+      if (input.period) {
+        const account = await ctx.repos.accounts.findById(ctx.accountId);
+        const range = resolvePeriod(
+          { period: input.period, from: input.from, to: input.to },
+          account?.timezone ?? "UTC",
+        );
+        return ctx.repos.transactions.listInRange(
+          ctx.accountId,
+          range.from,
+          range.to,
+          input.limit,
+          input.cursor,
+        );
+      }
+
+      return ctx.repos.transactions.listRecent(ctx.accountId, input.limit, input.cursor);
     }),
 
   create: protectedProcedure
     .input(transactionsCreateInputSchema)
     .mutation(async ({ input, ctx }) => {
-      const currency = input.currency ?? (await accountCurrency(ctx));
+      // Single-currency per account: ignore any per-transaction currency input and
+      // store in the account default so the balance SUM stays coherent.
+      const currency = await accountCurrency(ctx);
 
       const [created] = await ctx.repos.transactions.insertOne(ctx.accountId, {
         amountMinor: toMinor(input.amount, currency),
@@ -42,6 +59,9 @@ export const transactionsRouter = t.router({
 
       const newBalance = await ctx.repos.transactions.getNetBalance(ctx.accountId);
       await publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, currency);
+      await checkBudgetAlerts(ctx, [
+        { type: input.type, categoryId: input.categoryId ?? null, amountMinor: created.amountMinor },
+      ]);
 
       return { ok: true, transaction: created, newBalance };
     }),
@@ -61,7 +81,8 @@ export const transactionsRouter = t.router({
         });
       }
 
-      const currency = input.currency ?? current.currency;
+      // Pin to the account default currency; ignore any currency override.
+      const currency = await accountCurrency(ctx);
 
       await ctx.repos.transactions.updateById(ctx.accountId, input.id, {
         amountMinor:
@@ -77,7 +98,7 @@ export const transactionsRouter = t.router({
       });
 
       const newBalance = await ctx.repos.transactions.getNetBalance(ctx.accountId);
-      await publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, await accountCurrency(ctx));
+      await publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, currency);
 
       return { ok: true, newBalance };
     }),

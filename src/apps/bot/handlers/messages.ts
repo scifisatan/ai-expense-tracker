@@ -1,6 +1,6 @@
 import type { Bot } from "grammy"
 import type { BotContext } from "@bot/types"
-import { isKeyboardButton, msg } from "../ui"
+import { getUndoKeyboard, isKeyboardButton, msg } from "../ui"
 import { log } from "@/utils/logger"
 
 export const registerMessageHandlers = (bot: Bot<BotContext>) => {
@@ -45,7 +45,7 @@ export const registerMessageHandlers = (bot: Bot<BotContext>) => {
         chatId,
         processingMsg.message_id,
         msg.recorded(result.items, result.net, result.newBalance, result.currency),
-        { parse_mode: "Markdown" },
+        { parse_mode: "Markdown", reply_markup: getUndoKeyboard(result.insertedIds) },
       )
     } catch (error) {
       log.bot.error("[extract-error]", error)

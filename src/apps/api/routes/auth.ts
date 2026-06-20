@@ -14,6 +14,10 @@ export const authRouter = t.router({
     }
   }),
 
-  // The session cookie is cleared client-side; this exists for symmetry/future server-side revocation.
-  logout: protectedProcedure.mutation(() => ({ ok: true })),
+  // Bumps the account's tokenVersion, invalidating every outstanding session
+  // token ("log out everywhere"). The HttpOnly cookie is cleared via /api/auth/logout.
+  logout: protectedProcedure.mutation(async ({ ctx }) => {
+    await ctx.repos.accounts.bumpTokenVersion(ctx.accountId)
+    return { ok: true }
+  }),
 })

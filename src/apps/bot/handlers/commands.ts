@@ -87,6 +87,15 @@ export const registerCommandHandlers = (bot: Bot<BotContext>) => {
     sendRecentTransactions(ctx, ctx.chat.id),
   );
 
+  bot.command("month", async (ctx) => {
+    if (!(await requireLinked(ctx))) return;
+    const summary = await ctx.caller.insights.summary({ period: "month" });
+    await ctx.api.sendMessage(ctx.chat.id, msg.monthSummary(summary, summary.currency), {
+      parse_mode: "Markdown",
+      reply_markup: getChatKeyboard(),
+    });
+  });
+
   bot.command("help", async (ctx) => sendHelp(ctx, ctx.chat.id));
 
   bot.hears(BUTTON_BALANCE_RE, async (ctx) => {

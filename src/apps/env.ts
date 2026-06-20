@@ -2,9 +2,9 @@ import type { Context } from "hono"
 
 export type CloudflareBindings = {
   BOT_INFO: KVNamespace
-  AI_QUOTA: RateLimit
   BOT_TOKEN?: string
   AI_MODEL?: string
+  AI_DAILY_LIMIT?: string
   GROQ_API_KEY?: string
   WEBHOOK_URL?: string
   DB: D1Database

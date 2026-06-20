@@ -61,5 +61,29 @@ export const registerCallbackHandlers = (bot: Bot<BotContext>) => {
       await sendRecentTransactions(ctx, chatId);
       return;
     }
+
+    if (data.startsWith("ui:undo:")) {
+      const ids = data
+        .slice("ui:undo:".length)
+        .split(",")
+        .map((s) => Number(s))
+        .filter((n) => Number.isInteger(n));
+
+      if (!ids.length) {
+        await ctx.answerCallbackQuery();
+        return;
+      }
+
+      // delete recomputes the balance and refreshes the pinned message (Phase 2b),
+      // so no extra balance call is needed here.
+      await ctx.caller.transactions.delete({ ids });
+      await ctx.answerCallbackQuery({ text: "Removed" });
+
+      const messageId = ctx.callbackQuery.message?.message_id;
+      if (messageId) {
+        await ctx.api.editMessageText(chatId, messageId, msg.undone()).catch(() => {});
+      }
+      return;
+    }
   });
 };
