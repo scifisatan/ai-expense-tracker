@@ -1,6 +1,6 @@
 import type { AppDb } from "@/db/client"
 
-import { and, desc, eq, inArray, sql } from "drizzle-orm"
+import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm"
 import { transactions } from "@/db/schema"
 import type { NewLedgerTransaction } from "@/shared/types"
 
@@ -21,17 +21,103 @@ export type InsertLedgerPayload = {
 }
 
 export const createTransactionsRepo = (db: AppDb) => ({
-  listRecent: (accountId: string, limit: number) =>
-    db.query.transactions.findMany({
-      where: eq(transactions.accountId, accountId),
+  listRecent: async (accountId: string, limit: number, cursor?: number) => {
+    const rows = await db.query.transactions.findMany({
+      where: and(
+        eq(transactions.accountId, accountId),
+        cursor ? lt(transactions.id, cursor) : undefined
+      ),
       orderBy: [desc(transactions.id)],
-      limit,
-    }),
+      limit: limit + 1
+    })
+    const hasMore = rows.length > limit
+    const items = hasMore ? rows.slice(0, limit) : rows
+    return { items, nextCursor: hasMore ? items[items.length - 1]!.id : null }
+  },
 
   findById: (accountId: string, id: number) =>
     db.query.transactions.findFirst({
-      where: and(eq(transactions.id, id), eq(transactions.accountId, accountId)),
+      where: and(eq(transactions.id, id), eq(transactions.accountId, accountId))
     }),
+
+  // List transactions whose occurredAt is in [from, to). Cursor is the last id
+  // seen (descending), enabling keyset pagination over large histories. Fetches
+  // limit+1 to report whether another page exists.
+  listInRange: async (
+    accountId: string,
+    from: string,
+    to: string,
+    limit: number,
+    cursor?: number
+  ) => {
+    const rows = await db.query.transactions.findMany({
+      where: and(
+        eq(transactions.accountId, accountId),
+        gte(transactions.occurredAt, from),
+        lt(transactions.occurredAt, to),
+        cursor ? lt(transactions.id, cursor) : undefined
+      ),
+      orderBy: [desc(transactions.id)],
+      limit: limit + 1
+    })
+
+    const hasMore = rows.length > limit
+    const items = hasMore ? rows.slice(0, limit) : rows
+    return { items, nextCursor: hasMore ? items[items.length - 1]!.id : null }
+  },
+
+  getSummaryInRange: async (accountId: string, from: string, to: string) => {
+    const result = await db
+      .select({
+        income: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'Income' THEN ${transactions.amountMinor} ELSE 0 END), 0)`,
+        expense: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'Expense' THEN ${transactions.amountMinor} ELSE 0 END), 0)`,
+        net: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'Income' THEN ${transactions.amountMinor} ELSE -${transactions.amountMinor} END), 0)`,
+        count: sql<number>`COUNT(*)`
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.accountId, accountId),
+          gte(transactions.occurredAt, from),
+          lt(transactions.occurredAt, to)
+        )
+      )
+      .get()
+
+    return {
+      income: result?.income ?? 0,
+      expense: result?.expense ?? 0,
+      net: result?.net ?? 0,
+      transactions: result?.count ?? 0
+    }
+  },
+
+  // Total expense in [from, to) for a single category (null = all categories).
+  // Used for budget threshold checks.
+  getCategoryExpenseInRange: async (
+    accountId: string,
+    categoryId: number | null,
+    from: string,
+    to: string
+  ): Promise<number> => {
+    const result = await db
+      .select({
+        expense: sql<number>`COALESCE(SUM(${transactions.amountMinor}), 0)`
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.accountId, accountId),
+          eq(transactions.type, "Expense"),
+          gte(transactions.occurredAt, from),
+          lt(transactions.occurredAt, to),
+          categoryId === null ? undefined : eq(transactions.categoryId, categoryId)
+        )
+      )
+      .get()
+
+    return result?.expense ?? 0
+  },
 
   insertOne: (
     accountId: string,
@@ -43,7 +129,7 @@ export const createTransactionsRepo = (db: AppDb) => ({
       note?: string | null
       occurredAt?: string
       source: "web" | "telegram"
-    },
+    }
   ) =>
     db
       .insert(transactions)
@@ -55,7 +141,7 @@ export const createTransactionsRepo = (db: AppDb) => ({
         categoryId: input.categoryId ?? null,
         note: input.note ?? null,
         occurredAt: input.occurredAt,
-        source: input.source,
+        source: input.source
       })
       .returning(),
 
@@ -74,26 +160,31 @@ export const createTransactionsRepo = (db: AppDb) => ({
     const { accountId, items, source, fallbackNote } = payload
 
     if (items.length === 0) {
-      return Promise.resolve()
+      return Promise.resolve([] as { id: number }[])
     }
 
-    return db.insert(transactions).values(
-      items.map((item) => ({
-        accountId,
-        amountMinor: Math.abs(item.amountMinor),
-        currency: item.currency ?? "USD",
-        type: item.type,
-        categoryId: item.categoryId ?? null,
-        note: item.note ?? fallbackNote ?? null,
-        source,
-      })),
-    )
+    return db
+      .insert(transactions)
+      .values(
+        items.map((item) => ({
+          accountId,
+          amountMinor: Math.abs(item.amountMinor),
+          currency: item.currency ?? "USD",
+          type: item.type,
+          categoryId: item.categoryId ?? null,
+          note: item.note ?? fallbackNote ?? null,
+          // Omit when undefined so the column's CURRENT_TIMESTAMP default applies.
+          ...(item.occurredAt ? { occurredAt: item.occurredAt } : {}),
+          source
+        }))
+      )
+      .returning({ id: transactions.id })
   },
 
   getNetBalance: async (accountId: string): Promise<number> => {
     const result = await db
       .select({
-        net: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'Income' THEN ${transactions.amountMinor} ELSE -${transactions.amountMinor} END), 0)`,
+        net: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'Income' THEN ${transactions.amountMinor} ELSE -${transactions.amountMinor} END), 0)`
       })
       .from(transactions)
       .where(eq(transactions.accountId, accountId))
@@ -108,7 +199,7 @@ export const createTransactionsRepo = (db: AppDb) => ({
         income: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'Income' THEN ${transactions.amountMinor} ELSE 0 END), 0)`,
         expense: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'Expense' THEN ${transactions.amountMinor} ELSE 0 END), 0)`,
         net: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'Income' THEN ${transactions.amountMinor} ELSE -${transactions.amountMinor} END), 0)`,
-        count: sql<number>`COUNT(*)`,
+        count: sql<number>`COUNT(*)`
       })
       .from(transactions)
       .where(eq(transactions.accountId, accountId))
@@ -118,9 +209,9 @@ export const createTransactionsRepo = (db: AppDb) => ({
       income: result?.income ?? 0,
       expense: result?.expense ?? 0,
       net: result?.net ?? 0,
-      transactions: result?.count ?? 0,
+      transactions: result?.count ?? 0
     }
-  },
+  }
 })
 
 export type TransactionsRepo = ReturnType<typeof createTransactionsRepo>

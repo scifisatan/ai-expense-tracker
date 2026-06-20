@@ -126,7 +126,7 @@ oauthRoutes.get("/google/callback", async (c) => {
       name: claims.name ?? null,
     })
 
-    const sessionToken = await session.issueSession(account.id)
+    const sessionToken = await session.issueSession(account.id, account.tokenVersion)
     const secure = new URL(c.req.url).protocol === "https:"
 
     c.header("Set-Cookie", cookie(SESSION_COOKIE, sessionToken, 7 * 24 * 60 * 60, secure))

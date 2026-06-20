@@ -41,6 +41,16 @@ export const getMainMenu = () =>
     .row()
     .text("ℹ️ Help", "ui:help")
 
+// Undo button attached to a freshly-recorded message. Callback data carries the
+// inserted transaction ids. Telegram caps callback_data at 64 bytes, so for large
+// batches we fall back to undoing only the most recent id.
+export const getUndoKeyboard = (ids: number[]): InlineKeyboard | undefined => {
+  if (!ids.length) return undefined
+  let data = `ui:undo:${ids.join(",")}`
+  if (data.length > 64) data = `ui:undo:${ids[ids.length - 1]}`
+  return new InlineKeyboard().text("↩️ Undo", data)
+}
+
 // Persistent reply keyboard pinned to the chat composer.
 export const getChatKeyboard = () => ({
   keyboard: [
@@ -148,6 +158,9 @@ export const msg = {
     ].join("\n")
   },
 
+  // Shown after a recorded message is undone via the inline button.
+  undone: (): string => "↩️ Undone — those entries were removed and your balance is back to where it was.",
+
   // In-chat balance line (rich, Markdown). The pinned balance in
   // src/apps/api/lib/ledger.ts is sent as plain text and formatted there.
   balance: (balanceMinor: number, currency: string): string =>
@@ -165,6 +178,22 @@ export const msg = {
   noTransactions: (): string =>
     "📭 Nothing here yet! Tell me about a purchase — like `Spent 8 on lunch` — and it'll show up here.",
 
+  // This-month summary (income / expense / net).
+  monthSummary: (
+    summary: { income: number; expense: number; net: number; transactions: number },
+    currency: string,
+  ): string => {
+    const netSign = summary.net >= 0 ? "+" : "-"
+    return [
+      "📅 This month so far:",
+      "",
+      `Income: +${formatMoney(summary.income, currency)}`,
+      `Spending: -${formatMoney(summary.expense, currency)}`,
+      `Net: ${netSign}${formatMoney(Math.abs(summary.net), currency)}`,
+      `Across ${summary.transactions} ${summary.transactions === 1 ? "entry" : "entries"}.`,
+    ].join("\n")
+  },
+
   // /help.
   help: (): string =>
     [
@@ -178,6 +207,7 @@ export const msg = {
       "`/app` — Open your web dashboard",
       "`/balance` — Show your current balance",
       "`/transactions` — See recent activity",
+      "`/month` — This month's income, spending & net",
     ].join("\n"),
 
   // Shown when the account hits its daily AI extraction limit.

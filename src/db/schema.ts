@@ -9,6 +9,9 @@ export const accounts = sqliteTable('accounts', {
   oauthProvider: text('oauth_provider').notNull(),
   oauthSubject: text('oauth_subject').notNull(),
   defaultCurrency: text('default_currency').notNull().default('USD'),
+  timezone: text('timezone').notNull().default('UTC'),
+  // Bumped to invalidate all outstanding session tokens ("log out everywhere").
+  tokenVersion: integer('token_version').notNull().default(0),
   createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => {
   return {
@@ -25,6 +28,9 @@ export const telegramLinks = sqliteTable('telegram_links', {
   username: text('username'),
   firstName: text('first_name'),
   lastName: text('last_name'),
+  // Telegram message id of the pinned balance message, edited in place instead of
+  // posting (and pinning) a fresh one on every transaction.
+  pinnedMessageId: integer('pinned_message_id'),
   linkedAt: text('linked_at').notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => {
   return {
@@ -74,6 +80,33 @@ export const transactions = sqliteTable('transactions', {
   };
 });
 
+// Spending budgets. categoryId null = overall account budget.
+export const budgets = sqliteTable('budgets', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  accountId: text('account_id').notNull().references(() => accounts.id),
+  categoryId: integer('category_id').references(() => categories.id),
+  period: text('period').$type<"monthly">().notNull().default('monthly'),
+  amountMinor: integer('amount_minor').notNull(),
+  currency: text('currency').notNull().default('USD'),
+  createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => {
+  return {
+    accountIdIdx: index('idx_budgets_account_id').on(table.accountId),
+  };
+});
+
+// Records which budget threshold (80 / 100) has already alerted for a given
+// period key (e.g. "2026-06"), so each alert fires at most once.
+export const budgetAlerts = sqliteTable('budget_alerts', {
+  budgetId: integer('budget_id').notNull().references(() => budgets.id),
+  periodKey: text('period_key').notNull(),
+  threshold: integer('threshold').notNull(),
+}, (table) => {
+  return {
+    pk: uniqueIndex('idx_budget_alerts_unique').on(table.budgetId, table.periodKey, table.threshold),
+  };
+});
+
 export const accountSettings = sqliteTable('account_settings', {
   accountId: text('account_id').primaryKey().references(() => accounts.id),
   updatedAt: text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -87,6 +120,9 @@ export type LinkCode = typeof linkCodes.$inferSelect;
 export type NewLinkCode = typeof linkCodes.$inferInsert;
 export type Category = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
+export type Budget = typeof budgets.$inferSelect;
+export type NewBudget = typeof budgets.$inferInsert;
+export type BudgetAlert = typeof budgetAlerts.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type NewTransaction = typeof transactions.$inferInsert;
 export type AccountSetting = typeof accountSettings.$inferSelect;

@@ -32,6 +32,13 @@ export const createTelegramRepo = (db: AppDb) => ({
       .delete(telegramLinks)
       .where(and(eq(telegramLinks.accountId, accountId), eq(telegramLinks.chatId, chatId))),
 
+  // Remember which message holds the pinned balance so it can be edited in place.
+  setPinnedMessage: (chatId: number, messageId: number | null) =>
+    db
+      .update(telegramLinks)
+      .set({ pinnedMessageId: messageId })
+      .where(eq(telegramLinks.chatId, chatId)),
+
   // One-time link codes (bot-issued, web-confirmed)
   createCode: (code: NewLinkCode) => db.insert(linkCodes).values(code),
 

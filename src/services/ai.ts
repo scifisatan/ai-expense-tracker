@@ -3,16 +3,21 @@ import { createGroq } from "@ai-sdk/groq"
 import { TransactionsExtraction, transactionsSchema } from "@/shared/types"
 import { log } from "@/utils/logger"
 
-const SYSTEM_PROMPT = `Extract every monetary transaction mentioned in the message.
+const buildSystemPrompt = (today: string): string => `Extract every monetary transaction mentioned in the message.
+
+Today's date is ${today} (ISO YYYY-MM-DD).
 
 Return ONLY valid JSON with this exact shape:
-{"items":[{"amount":12.50,"type":"Expense","note":"coffee","category":"Food"}]}
+{"items":[{"amount":12.50,"type":"Expense","note":"coffee","category":"Food","occurredAt":"${today}"}]}
 
 Rules:
 - amount must be a positive number; decimals are allowed (strip currency symbols).
 - type must be either "Expense" or "Income".
 - note must describe the specific transaction amount it appears next to or on the same line as.
 - category is OPTIONAL: a short label like "Food", "Transport", "Shopping", "Bills", "Salary". Omit if unsure.
+- occurredAt is OPTIONAL: include it as YYYY-MM-DD ONLY when the message references a date
+  (e.g. "yesterday", "last Friday", "on the 3rd"); resolve it relative to today's date above.
+  OMIT occurredAt entirely when no date is mentioned.
 - Associate descriptive text with the closest relevant amount.
 - If no clear note is associated, use an empty string.
 - If no clear amounts are found, return: {"items":[]}
@@ -23,7 +28,7 @@ export const createAiService = (options: {
   groqApiKey: string
 }) => {
   return {
-    async extractTransactions(message: string): Promise<TransactionsExtraction> {
+    async extractTransactions(message: string, today: string): Promise<TransactionsExtraction> {
       const groq = createGroq({ apiKey: options.groqApiKey })
       const model = groq(options.model)
 
@@ -34,7 +39,7 @@ export const createAiService = (options: {
         const { object } = await generateObject({
           model,
           schema: transactionsSchema,
-          system: SYSTEM_PROMPT,
+          system: buildSystemPrompt(today),
           prompt: message,
         })
 

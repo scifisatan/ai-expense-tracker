@@ -11,6 +11,13 @@ describe("token session", () => {
     expect(payload?.accountId).toBe("acc_123")
   })
 
+  it("carries the tokenVersion in the signed payload", async () => {
+    const session = createTokenSession(SECRET)
+    const token = await session.issueSession("acc_123", 5)
+    const payload = await session.verifySession(token)
+    expect(payload?.tokenVersion).toBe(5)
+  })
+
   it("rejects a token signed with a different secret", async () => {
     const token = await createTokenSession(SECRET).issueSession("acc_123")
     const payload = await createTokenSession("other-secret").verifySession(token)
