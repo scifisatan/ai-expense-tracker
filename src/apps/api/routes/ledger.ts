@@ -9,6 +9,7 @@ import { localDateString, normalizeBackdate } from "@/shared/datetime";
 import type { Category } from "@/db/schema";
 
 const DEFAULT_AI_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+const DEFAULT_AI_DAILY_LIMIT = 50;
 
 const categoryKey = (type: "Income" | "Expense", name: string) =>
   `${type}|${name.trim().toLowerCase()}`;
@@ -24,7 +25,8 @@ export const ledgerRouter = t.router({
       const currency = account?.defaultCurrency ?? "USD";
       const timezone = account?.timezone ?? "UTC";
 
-      const quota = await consumeAiQuota(ctx.env.AI_QUOTA, ctx.accountId);
+      const dailyLimit = Number(ctx.env.AI_DAILY_LIMIT ?? DEFAULT_AI_DAILY_LIMIT);
+      const quota = await consumeAiQuota(ctx.env.BOT_INFO, ctx.accountId, dailyLimit);
       if (!quota.allowed) {
         return { items: [], net: 0, newBalance: null, currency, insertedIds: [], reason: "RATE_LIMITED" as const };
       }
