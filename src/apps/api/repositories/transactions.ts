@@ -66,6 +66,15 @@ export const createTransactionsRepo = (db: AppDb) => ({
     return { items, nextCursor: hasMore ? items[items.length - 1]!.id : null }
   },
 
+  countByAccount: async (accountId: string): Promise<number> => {
+    const row = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(transactions)
+      .where(eq(transactions.accountId, accountId))
+      .get()
+    return row?.count ?? 0
+  },
+
   getSummaryInRange: async (accountId: string, from: string, to: string) => {
     const result = await db
       .select({

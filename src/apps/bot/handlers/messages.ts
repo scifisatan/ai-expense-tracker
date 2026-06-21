@@ -36,6 +36,12 @@ export const registerMessageHandlers = (bot: Bot<BotContext>) => {
         return
       }
 
+      if (result.reason === "AI_ERROR") {
+        await ctx.api.deleteMessage(chatId, processingMsg.message_id).catch(() => {})
+        await ctx.reply(msg.genericError())
+        return
+      }
+
       if (!result.items.length || result.newBalance === null) {
         await ctx.api.deleteMessage(chatId, processingMsg.message_id).catch(() => {})
         return

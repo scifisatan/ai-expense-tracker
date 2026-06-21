@@ -31,23 +31,41 @@ export const createAiService = (options: {
     async extractTransactions(message: string, today: string): Promise<TransactionsExtraction> {
       const groq = createGroq({ apiKey: options.groqApiKey })
       const model = groq(options.model)
+      const system = buildSystemPrompt(today)
 
       log.ai.debug("ai.extractTransactions.model", options.model)
       log.ai.debug("ai.extractTransactions.prompt", message)
 
-      try {
-        const { object } = await generateObject({
-          model,
-          schema: transactionsSchema,
-          system: buildSystemPrompt(today),
-          prompt: message,
-        })
+      // The model intermittently emits JSON that fails the schema (or fails JSON
+      // mode outright). These failures are stochastic, so simply re-sampling clears
+      // most of them — try up to MAX_ATTEMPTS times before giving up.
+      const MAX_ATTEMPTS = 3
+      let lastError: unknown
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+          const { object } = await generateObject({
+            model,
+            schema: transactionsSchema,
+            system,
+            prompt: message,
+          })
 
-        return object
-      } catch (error) {
-        log.ai.error("ai.extractTransactions.failed", error)
-        throw error
+          if (attempt > 1) {
+            log.ai.debug("ai.extractTransactions.recovered", `attempt ${attempt}/${MAX_ATTEMPTS}`)
+          }
+          return object
+        } catch (error) {
+          lastError = error
+          log.ai.warn(
+            "ai.extractTransactions.attempt_failed",
+            `attempt ${attempt}/${MAX_ATTEMPTS}`,
+            error instanceof Error ? error.message : error,
+          )
+        }
       }
+
+      log.ai.error("ai.extractTransactions.failed", lastError)
+      throw lastError
     },
   }
 }

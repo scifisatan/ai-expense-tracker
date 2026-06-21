@@ -8,3 +8,6 @@ web/dist/
 .wrangler/
 # Claude Code worktrees/local
 .claude/
+
+# local secrets
+.dev.vars
