@@ -141,28 +141,44 @@ cp .dev.vars.example .dev.vars
 
 ## 6. Run database migrations
 
-Migrations live in `migrations/` (`0001`–`0006`).
+Migrations live in `migrations/` and are applied in numbered order.
 
 ```bash
-# Local D1 (used by `npm run dev`)
+# Local D1 (used by `npm run dev`) — run this after pulling new migrations
 npm run db:migrate:local
 
-# Remote/production D1
+# Remote/production D1 — runs automatically as part of `npm run deploy` (see step 7),
+# so you normally don't invoke this directly
 npm run db:migrate:remote
 ```
 
 > `0005_account_identity.sql` wipes the old Telegram-keyed tables and creates the
 > account-first schema. `0006_drop_groq_api_key.sql` drops the obsolete per-account Groq key
-> column. Run migrations against the remote DB **before** the first production deploy.
+> column.
+>
+> **Remote migrations are part of the deploy step.** `npm run deploy` applies any pending
+> remote migrations *before* uploading the new Worker, so code and schema always ship
+> together. This prevents the common failure mode where new code is deployed against an
+> un-migrated database and a feature silently breaks. Because migrations run first, keep them
+> backward-compatible with the currently-deployed code (additive changes), or take a brief
+> maintenance window for destructive ones.
 
 ---
 
 ## 7. Deploy
 
 ```bash
-npm run build      # vite build
-npm run deploy     # builds, then deploys through Wrangler's Vite-generated redirect
+npm run deploy     # applies pending remote migrations, builds, then deploys
 ```
+
+`npm run deploy` runs three steps in order: `db:migrate:remote` → `vite build` → `wrangler
+deploy`. If a migration fails, the build and upload never run, so you can't ship code against
+a stale schema.
+
+> **If you deploy via Cloudflare's Git integration (Workers Builds)** rather than running the
+> command locally, set the project's **deploy command** to `npm run deploy` (instead of the
+> default `npx wrangler deploy`) so the build pipeline applies migrations too. Workers Builds
+> runs non-interactively, so the migration step auto-confirms.
 
 The Vite/Cloudflare build intentionally writes two output folders:
 
