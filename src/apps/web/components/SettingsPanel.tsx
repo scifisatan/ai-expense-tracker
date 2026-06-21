@@ -1,6 +1,13 @@
 import { useState } from "react"
 import { toast } from "sonner"
-import { MessageCircle, Settings as SettingsIcon, Tags, Trash2, Wallet } from "lucide-react"
+import {
+  AlertTriangle,
+  MessageCircle,
+  Settings as SettingsIcon,
+  Tags,
+  Trash2,
+  Wallet
+} from "lucide-react"
 import { trpc } from "@web/trpc"
 import type { TransactionType } from "@/shared/types"
 import { formatMoney } from "@/shared/money"
@@ -42,12 +49,15 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
   const deleteCategory = trpc.categories.delete.useMutation()
   const createBudget = trpc.budgets.create.useMutation()
   const deleteBudget = trpc.budgets.remove.useMutation()
+  const deleteAccount = trpc.auth.deleteAccount.useMutation()
 
   const [code, setCode] = useState("")
   const [newCatName, setNewCatName] = useState("")
   const [newCatType, setNewCatType] = useState<TransactionType>("Expense")
   const [newBudgetCategory, setNewBudgetCategory] = useState<string>(OVERALL_BUDGET)
   const [newBudgetAmount, setNewBudgetAmount] = useState("")
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState("")
 
   const saveCurrency = async (currency: string) => {
     await setCurrency.mutateAsync({ currency })
@@ -119,6 +129,18 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
     await deleteBudget.mutateAsync({ id })
     await budgetsQuery.refetch()
     toast.success("Budget removed")
+  }
+
+  const confirmDelete = async () => {
+    try {
+      await deleteAccount.mutateAsync()
+      // The session cookie is HttpOnly, so it must be cleared server-side. A full
+      // reload then drops us back on the auth screen with no stale cached data.
+      await fetch("/api/auth/logout", { method: "POST" })
+      window.location.href = "/"
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't delete account — try again.")
+    }
   }
 
   const settings = settingsQuery.data
@@ -208,6 +230,67 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
             <p className="text-xs text-muted-foreground">
               Used to resolve dates like "yesterday" and to bucket monthly summaries.
             </p>
+
+            <div className="mt-8 rounded-md border border-destructive/40 p-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm font-medium">Delete account</p>
+                  <p className="text-xs text-muted-foreground">
+                    Permanently deletes your account and everything in it — transactions,
+                    categories, budgets, and Telegram connections. This can't be undone.
+                  </p>
+                </div>
+              </div>
+
+              {!confirmingDelete ? (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => setConfirmingDelete(true)}
+                >
+                  Delete account
+                </Button>
+              ) : (
+                <div className="mt-3 flex flex-col gap-2">
+                  <Label htmlFor="settings-delete-confirm" className="text-xs">
+                    Type <span className="font-medium">{settings?.email}</span> to confirm
+                  </Label>
+                  <Input
+                    id="settings-delete-confirm"
+                    value={deleteConfirm}
+                    onChange={(e) => setDeleteConfirm(e.target.value)}
+                    placeholder={settings?.email ?? ""}
+                    autoComplete="off"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={
+                        deleteAccount.isPending ||
+                        !settings?.email ||
+                        deleteConfirm.trim().toLowerCase() !== settings.email.toLowerCase()
+                      }
+                      onClick={confirmDelete}
+                    >
+                      {deleteAccount.isPending ? "Deleting…" : "Permanently delete"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setConfirmingDelete(false)
+                        setDeleteConfirm("")
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           </TabsContent>
 
           {/* Budgets */}
