@@ -9,7 +9,7 @@
   "main": "src/index.ts",
   "scripts": {
     "dev": "vite",
-    "deploy": "vite build && wrangler deploy",
+    "deploy": "npm run db:migrate:remote && vite build && wrangler deploy",
     "cf-typegen": "wrangler types",
     "db:migrate:local": "wrangler d1 migrations apply telegram_budget_bot --local",
     "db:migrate:remote": "wrangler d1 migrations apply telegram_budget_bot --remote",
