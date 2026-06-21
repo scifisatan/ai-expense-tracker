@@ -61,6 +61,10 @@ export function useTransaction(onMutationSuccess?: () => void) {
         flash("Daily AI limit reached — try again tomorrow or add entries manually.", 4000)
         return false
       }
+      if (result.reason === "AI_ERROR") {
+        flash("AI couldn't process that right now — please try again.", 3500)
+        return false
+      }
       if (!result.items.length) {
         flash("No transactions found in that text.", 3000)
         return false

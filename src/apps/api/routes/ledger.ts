@@ -6,7 +6,9 @@ import { checkBudgetAlerts } from "@api/lib/budgets";
 import { consumeAiQuota } from "@api/lib/rate-limit";
 import { toMinor } from "@/shared/money";
 import { localDateString, normalizeBackdate } from "@/shared/datetime";
+import { log } from "@/utils/logger";
 import type { Category } from "@/db/schema";
+import type { TransactionsExtraction } from "@/shared/types";
 
 const DEFAULT_AI_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
 const DEFAULT_AI_DAILY_LIMIT = 50;
@@ -36,7 +38,15 @@ export const ledgerRouter = t.router({
         groqApiKey: ctx.env.GROQ_API_KEY ?? "",
       });
 
-      const extracted = await ai.extractTransactions(input.text, localDateString(timezone));
+      let extracted: TransactionsExtraction;
+      try {
+        extracted = await ai.extractTransactions(input.text, localDateString(timezone));
+      } catch (error) {
+        // The AI service already retried; degrade gracefully instead of surfacing a
+        // 500 to the web NL box / Telegram bot.
+        log.ai.error("ledger.ingestText.ai_failed", error);
+        return { items: [], net: 0, newBalance: null, currency, insertedIds: [], reason: "AI_ERROR" as const };
+      }
       if (!extracted.items.length) {
         return { items: [], net: 0, newBalance: null, currency, insertedIds: [], reason: "NO_ITEMS" as const };
       }
