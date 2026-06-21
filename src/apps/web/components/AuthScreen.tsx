@@ -1,25 +1,60 @@
+import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 import {
   ArrowDownRight,
   ArrowUpRight,
+  Globe,
   Lock,
   MessageCircle,
+  MoveRight,
+  Send,
   Sparkles,
   Wallet,
-} from "lucide-react"
+} from "lucide-react";
 
-import { Button } from "@web/components/ui/button"
-import { Badge } from "@web/components/ui/badge"
+import { Button } from "@web/components/ui/button";
+import { Badge } from "@web/components/ui/badge";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@web/components/ui/card"
-import { Separator } from "@web/components/ui/separator"
-import ThemeToggle from "@web/components/ThemeToggle"
-import { formatMoney } from "@web/helper"
-import { cn } from "@web/lib/utils"
+} from "@web/components/ui/card";
+import { Separator } from "@web/components/ui/separator";
+import { Footer } from "@web/components/ui/footer";
+import {
+  NavigationMenu,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  navigationMenuTriggerStyle,
+} from "@web/components/ui/navigation-menu";
+import ThemeToggle from "@web/components/ThemeToggle";
+import { formatMoney } from "@web/helper";
+import { cn } from "@web/lib/utils";
+
+// Fade-and-rise as the element scrolls into view. `once` so it doesn't replay
+// on scroll-back; the negative margin triggers it slightly before fully visible.
+const Reveal = ({
+  children,
+  className,
+  delay = 0,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+}) => (
+  <motion.div
+    className={className}
+    initial={{ opacity: 0, y: 24 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    viewport={{ once: true, margin: "-80px" }}
+    transition={{ duration: 0.5, delay, ease: "easeOut" }}
+  >
+    {children}
+  </motion.div>
+);
 
 // Local brand lockup — mirrors the Dashboard header without sharing a component,
 // so the landing and the app feel like the same product.
@@ -30,13 +65,47 @@ const Brand = () => (
     </span>
     <span className="text-base font-semibold tracking-tight">Budget</span>
   </div>
-)
+);
+
+const NAV_LINKS = [
+  { href: "#preview", label: "Preview" },
+  { href: "#features", label: "Features" },
+];
+
+const Nav = () => (
+  <header className="sticky top-0 z-20 border-b bg-background/80 backdrop-blur">
+    <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
+      <Brand />
+      <NavigationMenu className="hidden sm:flex">
+        <NavigationMenuList>
+          {NAV_LINKS.map((link) => (
+            <NavigationMenuItem key={link.href}>
+              <NavigationMenuLink
+                href={link.href}
+                className={navigationMenuTriggerStyle()}
+              >
+                {link.label}
+              </NavigationMenuLink>
+            </NavigationMenuItem>
+          ))}
+        </NavigationMenuList>
+      </NavigationMenu>
+      <div className="flex items-center gap-1">
+        <ThemeToggle />
+        {/* Server-side OAuth redirect — must stay a plain link, not a tRPC call. */}
+        <Button asChild size="sm">
+          <a href="/api/auth/google">Sign in</a>
+        </Button>
+      </div>
+    </div>
+  </header>
+);
 
 type Feature = {
-  icon: typeof Sparkles
-  title: string
-  body: string
-}
+  icon: typeof Sparkles;
+  title: string;
+  body: string;
+};
 
 const features: Feature[] = [
   {
@@ -54,7 +123,7 @@ const features: Feature[] = [
     title: "Yours, private by default",
     body: "No setup, no API keys. Your money stays yours, not a product.",
   },
-]
+];
 
 const FeatureCard = ({ icon: Icon, title, body }: Feature) => (
   <Card className="h-full">
@@ -66,7 +135,7 @@ const FeatureCard = ({ icon: Icon, title, body }: Feature) => (
       <CardDescription>{body}</CardDescription>
     </CardHeader>
   </Card>
-)
+);
 
 // A purely presentational mock of the feed — no data fetching on a pre-auth route.
 const PreviewRow = ({
@@ -75,16 +144,18 @@ const PreviewRow = ({
   amountMinor,
   income = false,
 }: {
-  label: string
-  meta: string
-  amountMinor: number
-  income?: boolean
+  label: string;
+  meta: string;
+  amountMinor: number;
+  income?: boolean;
 }) => (
   <div className="flex items-center gap-3">
     <span
       className={cn(
         "flex size-8 shrink-0 items-center justify-center rounded-full",
-        income ? "bg-income-muted text-income" : "bg-expense-muted text-expense"
+        income
+          ? "bg-income-muted text-income"
+          : "bg-expense-muted text-expense",
       )}
     >
       {income ? (
@@ -100,14 +171,14 @@ const PreviewRow = ({
     <span
       className={cn(
         "tabular text-sm font-semibold",
-        income ? "text-income" : "text-foreground"
+        income ? "text-income" : "text-foreground",
       )}
     >
       {income ? "+" : "−"}
       {formatMoney(amountMinor, "USD")}
     </span>
   </div>
-)
+);
 
 const Preview = () => (
   <Card className="relative overflow-hidden">
@@ -132,7 +203,116 @@ const Preview = () => (
       </div>
     </CardContent>
   </Card>
-)
+);
+
+const Hero = () => {
+  const [titleNumber, setTitleNumber] = useState(0);
+  const titles = useMemo(
+    () => [
+      "effortless",
+      "private",
+      "in plain words",
+      "always in sync",
+      "yours",
+    ],
+    [],
+  );
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setTitleNumber((n) => (n === titles.length - 1 ? 0 : n + 1));
+    }, 2000);
+    return () => clearTimeout(timeoutId);
+  }, [titleNumber, titles]);
+
+  return (
+    <section
+      id="preview"
+      className="grid scroll-mt-20 items-center gap-10 py-12 sm:py-20 lg:grid-cols-2 lg:gap-12"
+    >
+      {/* Hero copy */}
+      <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
+        <Badge variant="secondary">Money, in plain words</Badge>
+        <h1 className="mt-5 max-w-xl text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
+          <span>Money tracking that's</span>
+          <span className="relative flex w-full justify-center overflow-hidden pt-1 pb-2 lg:justify-start">
+            &nbsp;
+            {titles.map((title, index) => (
+              <motion.span
+                key={index}
+                className="absolute font-semibold text-primary"
+                initial={{ opacity: 0, y: -100 }}
+                transition={{ type: "spring", stiffness: 50 }}
+                animate={
+                  titleNumber === index
+                    ? { y: 0, opacity: 1 }
+                    : { y: titleNumber > index ? -150 : 150, opacity: 0 }
+                }
+              >
+                {title}
+              </motion.span>
+            ))}
+          </span>
+        </h1>
+        <p className="mt-4 max-w-md text-base text-muted-foreground text-balance sm:text-lg">
+          Log spending on the web or from Telegram in plain language — calm,
+          private, and always in sync.
+        </p>
+
+        <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row lg:items-start">
+          {/* Server-side OAuth redirect — must stay a plain link, not a tRPC call. */}
+          <Button asChild size="lg" className="gap-2">
+            <a href="/api/auth/google">
+              Continue with Google <MoveRight className="size-4" />
+            </a>
+          </Button>
+          <Button asChild size="lg" variant="outline" className="gap-2">
+            <a href="#features">See features</a>
+          </Button>
+        </div>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Free. No card. Connect Telegram later.
+        </p>
+      </div>
+
+      <motion.div
+        className="relative mx-auto w-full max-w-md"
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.15, ease: "easeOut" }}
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -inset-6 -z-10 rounded-full bg-primary/15 blur-3xl"
+        />
+        <p className="mb-3 text-center text-sm font-medium text-muted-foreground lg:text-left">
+          This is what you'll see
+        </p>
+        <Preview />
+      </motion.div>
+    </section>
+  );
+};
+
+const Features = () => (
+  <section id="features" className="scroll-mt-20 py-12 sm:py-16">
+    <Reveal className="mx-auto max-w-2xl text-center">
+      <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+        Everything you need, nothing you don't
+      </h2>
+      <p className="mt-3 text-muted-foreground">
+        Built to get out of your way — add money in seconds, from anywhere.
+      </p>
+    </Reveal>
+    <div className="mt-10 grid gap-4 sm:grid-cols-3">
+      {features.map((f, i) => (
+        <Reveal key={f.title} delay={i * 0.12} className="h-full">
+          <FeatureCard {...f} />
+        </Reveal>
+      ))}
+    </div>
+  </section>
+);
 
 const AuthScreen = () => {
   return (
@@ -143,60 +323,50 @@ const AuthScreen = () => {
         className="pointer-events-none absolute -top-32 left-1/2 size-[28rem] -translate-x-1/2 rounded-full bg-primary/15 blur-3xl"
       />
 
-      <div className="relative mx-auto flex min-h-dvh max-w-5xl flex-col px-4">
-        {/* Top bar */}
-        <header className="flex h-16 items-center justify-between">
-          <Brand />
-          <ThemeToggle />
-        </header>
+      <Nav />
 
-        <main className="flex flex-1 flex-col">
-          {/* Hero */}
-          <section className="mx-auto flex w-full max-w-2xl flex-col items-center py-10 text-center sm:py-16">
-            <Badge variant="secondary">Money, in plain words</Badge>
-            <h1 className="mt-5 text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-              Track your money by just saying it.
-            </h1>
-            <p className="mt-4 max-w-md text-base text-muted-foreground text-balance sm:text-lg">
-              Log spending on the web or from Telegram in plain language —
-              calm, private, and always in sync.
-            </p>
+      <main className="relative mx-auto max-w-5xl px-4">
+        <Hero />
+        <Features />
+      </main>
 
-            <div className="mt-8 flex w-full flex-col items-center gap-3">
-              {/* Server-side OAuth redirect — must stay a plain link, not a tRPC call. */}
-              <Button asChild size="lg" className="w-full sm:w-auto">
-                <a href="/api/auth/google">Continue with Google</a>
-              </Button>
-              <p className="text-sm text-muted-foreground">
-                Free. No card. Connect Telegram later.
-              </p>
-            </div>
-          </section>
-
-          {/* Proof row */}
-          <section className="grid gap-4 sm:grid-cols-3">
-            {features.map((f) => (
-              <FeatureCard key={f.title} {...f} />
-            ))}
-          </section>
-
-          {/* Mini preview */}
-          <section className="mx-auto mt-10 w-full max-w-md sm:mt-14">
-            <p className="mb-3 text-center text-sm font-medium text-muted-foreground">
-              This is what you'll see
-            </p>
-            <Preview />
-          </section>
-        </main>
-
-        {/* Footer */}
-        <footer className="flex items-center justify-center gap-2 py-8 text-xs text-muted-foreground">
-          <MessageCircle className="size-3.5" />
-          <span>Web and Telegram, always in sync.</span>
-        </footer>
-      </div>
+      <Reveal className="relative mx-auto max-w-5xl px-4">
+        <Footer
+          logo={
+            <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Wallet className="size-4" />
+            </span>
+          }
+          brandName="Budget"
+          socialLinks={[
+            {
+              icon: <Send className="h-5 w-5" />,
+              href: "https://t.me",
+              label: "Telegram",
+            },
+            {
+              icon: <Globe className="h-5 w-5" />,
+              href: "https://github.com",
+              label: "GitHub",
+            },
+          ]}
+          mainLinks={[
+            { href: "#preview", label: "Preview" },
+            { href: "#features", label: "Features" },
+            { href: "/api/auth/google", label: "Sign in" },
+          ]}
+          legalLinks={[
+            { href: "#", label: "Privacy" },
+            { href: "#", label: "Terms" },
+          ]}
+          copyright={{
+            text: `© ${new Date().getFullYear()} Budget`,
+            license: "Web and Telegram, always in sync.",
+          }}
+        />
+      </Reveal>
     </div>
-  )
-}
+  );
+};
 
-export default AuthScreen
+export default AuthScreen;
