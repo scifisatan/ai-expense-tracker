@@ -67,6 +67,17 @@ export const createAccountsRepo = (db: AppDb) => ({
   setTimezone: (id: string, timezone: string) =>
     db.update(accounts).set({ timezone }).where(eq(accounts.id, id)),
 
+  // First-run onboarding: set currency + timezone and mark onboarding complete.
+  completeOnboarding: (id: string, input: { currency: string; timezone: string }) =>
+    db
+      .update(accounts)
+      .set({
+        defaultCurrency: input.currency,
+        timezone: input.timezone,
+        onboardedAt: sql`CURRENT_TIMESTAMP`,
+      })
+      .where(eq(accounts.id, id)),
+
   // Invalidate every outstanding session token for the account.
   bumpTokenVersion: (id: string) =>
     db

@@ -1,9 +1,11 @@
 import { Wallet } from "lucide-react"
 
 import { useAuth } from "@web/hooks/useAuth"
+import { trpc } from "@web/trpc"
 
 import Dashboard from "@web/components/Dashboard"
 import AuthScreen from "@web/components/AuthScreen"
+import OnboardingScreen from "@web/components/OnboardingScreen"
 import { Skeleton } from "@web/components/ui/skeleton"
 
 const LoadingScreen = () => (
@@ -20,10 +22,19 @@ const LoadingScreen = () => (
 
 export const App = () => {
   const { session, isLoading, handleLogout } = useAuth()
+  const settingsQuery = trpc.settings.get.useQuery(undefined, {
+    enabled: !!session?.authenticated
+  })
 
   if (isLoading) return <LoadingScreen />
 
   if (!session?.authenticated) return <AuthScreen />
+
+  if (settingsQuery.isPending || !settingsQuery.data) return <LoadingScreen />
+
+  if (!settingsQuery.data.onboarded) {
+    return <OnboardingScreen onDone={() => settingsQuery.refetch()} />
+  }
 
   return <Dashboard email={session.email} onLogout={handleLogout} />
 }

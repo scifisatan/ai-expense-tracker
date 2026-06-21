@@ -12,6 +12,9 @@ export const accounts = sqliteTable('accounts', {
   timezone: text('timezone').notNull().default('UTC'),
   // Bumped to invalidate all outstanding session tokens ("log out everywhere").
   tokenVersion: integer('token_version').notNull().default(0),
+  // Set when the account completes first-run onboarding (currency + timezone).
+  // NULL means onboarding is still pending.
+  onboardedAt: text('onboarded_at'),
   createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => {
   return {

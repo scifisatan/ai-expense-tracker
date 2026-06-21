@@ -23,26 +23,7 @@ import {
   SelectValue
 } from "@web/components/ui/select"
 import { cn } from "@web/lib/utils"
-
-const CURRENCIES = ["USD", "EUR", "GBP", "INR", "NPR", "JPY", "AUD", "CAD"]
-
-const TIMEZONES = [
-  "UTC",
-  "America/New_York",
-  "America/Chicago",
-  "America/Denver",
-  "America/Los_Angeles",
-  "America/Sao_Paulo",
-  "Europe/London",
-  "Europe/Berlin",
-  "Europe/Paris",
-  "Asia/Kolkata",
-  "Asia/Kathmandu",
-  "Asia/Dubai",
-  "Asia/Singapore",
-  "Asia/Tokyo",
-  "Australia/Sydney"
-]
+import { CURRENCIES, TIMEZONES } from "@web/lib/locale"
 
 const OVERALL_BUDGET = "overall"
 
@@ -70,7 +51,14 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
 
   const saveCurrency = async (currency: string) => {
     await setCurrency.mutateAsync({ currency })
-    await settingsQuery.refetch()
+    // The dashboard hero, summary stats, and activity rows all format amounts in
+    // the account default currency, so invalidate them too — otherwise they keep
+    // the old symbol until a full page reload.
+    await Promise.all([
+      settingsQuery.refetch(),
+      utils.insights.summary.invalidate(),
+      utils.transactions.list.invalidate()
+    ])
     toast.success("Default currency updated")
   }
 
@@ -177,7 +165,11 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
           {/* General */}
           <TabsContent value="general" className="mt-6 flex flex-col gap-2">
             <Label htmlFor="settings-currency">Default currency</Label>
-            <Select value={settings?.defaultCurrency ?? "USD"} onValueChange={saveCurrency}>
+            <Select
+              value={settings?.defaultCurrency ?? "USD"}
+              onValueChange={saveCurrency}
+              disabled={settings?.currencyLocked}
+            >
               <SelectTrigger id="settings-currency" className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -190,7 +182,9 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Every transaction is stored in this currency.
+              {settings?.currencyLocked
+                ? "Locked because you already have transactions — every transaction is stored in this currency."
+                : "Every transaction is stored in this currency. It locks once you add your first transaction."}
             </p>
 
             <Label htmlFor="settings-timezone" className="mt-4">
