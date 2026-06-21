@@ -1,7 +1,15 @@
 import type { AppDb } from "@/db/client"
 
-import { and, eq, sql } from "drizzle-orm"
-import { accounts, categories } from "@/db/schema"
+import { and, eq, inArray, sql } from "drizzle-orm"
+import {
+  accountSettings,
+  accounts,
+  budgetAlerts,
+  budgets,
+  categories,
+  telegramLinks,
+  transactions,
+} from "@/db/schema"
 import type { Account } from "@/db/schema"
 
 export type OauthProfile = {
@@ -84,6 +92,26 @@ export const createAccountsRepo = (db: AppDb) => ({
       .update(accounts)
       .set({ tokenVersion: sql`${accounts.tokenVersion} + 1` })
       .where(eq(accounts.id, id)),
+
+  // Permanently delete the account and every row that belongs to it. Deletes run
+  // child-before-parent so the foreign-key references are always satisfied, and
+  // are batched so the whole erasure is atomic (all-or-nothing).
+  deleteAccount: (id: string) => {
+    const accountBudgetIds = db
+      .select({ id: budgets.id })
+      .from(budgets)
+      .where(eq(budgets.accountId, id))
+
+    return db.batch([
+      db.delete(budgetAlerts).where(inArray(budgetAlerts.budgetId, accountBudgetIds)),
+      db.delete(budgets).where(eq(budgets.accountId, id)),
+      db.delete(transactions).where(eq(transactions.accountId, id)),
+      db.delete(categories).where(eq(categories.accountId, id)),
+      db.delete(telegramLinks).where(eq(telegramLinks.accountId, id)),
+      db.delete(accountSettings).where(eq(accountSettings.accountId, id)),
+      db.delete(accounts).where(eq(accounts.id, id)),
+    ])
+  },
 })
 
 export type AccountsRepo = ReturnType<typeof createAccountsRepo>

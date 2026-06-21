@@ -20,4 +20,12 @@ export const authRouter = t.router({
     await ctx.repos.accounts.bumpTokenVersion(ctx.accountId)
     return { ok: true }
   }),
+
+  // Permanently erase the account and all of its data. Outstanding session tokens
+  // become invalid immediately since the account row they reference no longer
+  // exists; the client still clears the HttpOnly cookie via /api/auth/logout.
+  deleteAccount: protectedProcedure.mutation(async ({ ctx }) => {
+    await ctx.repos.accounts.deleteAccount(ctx.accountId)
+    return { ok: true }
+  }),
 })
