@@ -52,7 +52,13 @@ export const registerCallbackHandlers = (bot: Bot<BotContext>) => {
 
     if (data === "ui:balance") {
       await ctx.answerCallbackQuery();
-      await ctx.caller.ledger.refreshBalance();
+      // Reply in-chat as well as refreshing the pin — an in-place pin edit alone
+      // gives no visible feedback for the tap.
+      const { newBalance, currency } = await ctx.caller.ledger.refreshBalance();
+      await ctx.api.sendMessage(chatId, msg.balance(newBalance, currency), {
+        parse_mode: "Markdown",
+        reply_markup: getChatKeyboard(),
+      });
       return;
     }
 

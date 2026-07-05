@@ -1,4 +1,4 @@
-import { Bot } from "grammy";
+import { Api, Bot } from "grammy";
 import { Hono } from "hono";
 import { createBotCaller } from "@api/caller";
 import { createDb } from "@/db/client";
@@ -21,6 +21,7 @@ const buildBot = async (
   token: string,
   botInfo: string,
   env: CloudflareBindings,
+  waitUntil: (promise: Promise<unknown>) => void,
 ): Promise<Bot<BotContext>> => {
   const bot = new Bot<BotContext>(token, { botInfo: JSON.parse(botInfo) });
   await bot.init();
@@ -49,6 +50,7 @@ const buildBot = async (
         firstName: ctx.from?.first_name,
         lastName: ctx.from?.last_name,
       },
+      waitUntil,
     });
 
     const username = ctx.from?.username ?? "";
@@ -96,12 +98,33 @@ botRoutes.post("/*", async (c) => {
   }
 
   const env = c.env;
+  // Bot handlers run inside `waitUntil` below, so background work they spawn must
+  // be registered with the real execution context or it can be cancelled when
+  // update processing resolves.
+  const waitUntil = (p: Promise<unknown>) => c.executionCtx.waitUntil(p);
   const processUpdate = async () => {
     try {
-      const bot = await buildBot(token, botInfo, env);
+      const bot = await buildBot(token, botInfo, env, waitUntil);
       await bot.handleUpdate(update);
     } catch (error) {
       log.bot.error("Failed to process update", error);
+
+      // Best-effort: tell the user their message wasn't recorded. A failed reply
+      // must not throw out of this catch block.
+      const chatId =
+        update.message?.chat.id ??
+        update.edited_message?.chat.id ??
+        update.callback_query?.message?.chat.id;
+      if (chatId !== undefined) {
+        try {
+          await new Api(token).sendMessage(
+            chatId,
+            "⚠️ Something went wrong and that message wasn't recorded. Please try again.",
+          );
+        } catch (replyError) {
+          log.bot.error("Failed to send failure reply", replyError);
+        }
+      }
     }
   };
 

@@ -75,6 +75,10 @@ const TransactionDialog = ({
   const [amount, setAmount] = useState("")
   const [categoryId, setCategoryId] = useState<number | null>(null)
   const [note, setNote] = useState("")
+  // Edit-only. Tracked against the seeded value so an untouched date is omitted
+  // from the patch (preserving the original time-of-day).
+  const [date, setDate] = useState("")
+  const [seededDate, setSeededDate] = useState("")
   const [saving, setSaving] = useState(false)
   const [showError, setShowError] = useState(false)
 
@@ -91,11 +95,20 @@ const TransactionDialog = ({
       setAmount(String(fromMinor(initial.amountMinor, initial.currency)))
       setCategoryId(initial.categoryId)
       setNote(initial.note ?? "")
+      // Same parsing as the feed rows, rendered as YYYY-MM-DD for the input.
+      const parsed = new Date(initial.occurredAt)
+      const day = Number.isNaN(parsed.getTime())
+        ? ""
+        : parsed.toLocaleDateString("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" })
+      setDate(day)
+      setSeededDate(day)
     } else {
       setType("Expense")
       setAmount("")
       setCategoryId(null)
       setNote("")
+      setDate("")
+      setSeededDate("")
     }
   }, [open, mode, initial])
 
@@ -119,7 +132,13 @@ const TransactionDialog = ({
     }
     setSaving(true)
     if (mode === "edit" && initial) {
-      await onUpdate?.(initial, { amount: amountValue, type, categoryId, note: note || null })
+      await onUpdate?.(initial, {
+        amount: amountValue,
+        type,
+        categoryId,
+        note: note || null,
+        ...(date && date !== seededDate ? { occurredAt: date } : {})
+      })
       setSaving(false)
       return true
     }
@@ -256,6 +275,20 @@ const TransactionDialog = ({
               </SelectContent>
             </Select>
           </div>
+
+          {mode === "edit" && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="tx-date">Date</Label>
+              <input
+                id="tx-date"
+                type="date"
+                value={date}
+                max={new Date().toLocaleDateString("en-CA")}
+                onChange={(e) => setDate(e.target.value)}
+                className="rounded-xl border bg-background px-3 py-2 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40"
+              />
+            </div>
+          )}
 
           <div className="grid gap-1.5">
             <Label htmlFor="tx-note">Note</Label>

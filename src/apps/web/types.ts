@@ -15,6 +15,8 @@ type TxUpdatePatch = {
   type?: TransactionType
   note?: string | null
   categoryId?: number | null
+  // "YYYY-MM-DD"; omitted when the date wasn't changed.
+  occurredAt?: string
 }
 
 type SortKey = "id" | "amountMinor" | "type" | "occurredAt"

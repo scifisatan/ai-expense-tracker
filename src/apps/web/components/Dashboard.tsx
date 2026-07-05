@@ -3,6 +3,7 @@ import { toast } from "sonner"
 import { LogOut, Settings as SettingsIcon, Wallet } from "lucide-react"
 import { useTransaction } from "../hooks/useTransaction"
 import BalanceHero from "./BalanceHero"
+import BudgetsCard from "./BudgetsCard"
 import CommandBar from "./CommandBar"
 import ActivityFeed from "./ActivityFeed"
 import SettingsPanel from "./SettingsPanel"
@@ -33,11 +34,11 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
   const [settingsOpen, setSettingsOpen] = useState(false)
   const currency = summary?.currency ?? "USD"
 
-  // Surface the hook's status string as a toast (success unless it reads like a failure).
+  // Surface the hook's status as a toast.
   useEffect(() => {
     if (!status) return
-    if (/fail|error|no transactions|couldn't|limit reached/i.test(status)) toast.error(status)
-    else toast.success(status)
+    if (status.kind === "error") toast.error(status.text)
+    else toast.success(status.text)
   }, [status])
 
   const todayDeltaMinor = useMemo(() => {
@@ -91,12 +92,14 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
 
       <main className="mx-auto max-w-2xl space-y-5 px-4 py-5 sm:py-7">
         <BalanceHero
-          netMinor={summary?.net ?? 0}
+          balanceMinor={summary?.balance ?? 0}
           todayDeltaMinor={todayDeltaMinor}
           incomeMinor={summary?.income ?? 0}
           expenseMinor={summary?.expense ?? 0}
           currency={currency}
         />
+
+        <BudgetsCard categories={categories} />
 
         <CommandBar
           categories={categories}

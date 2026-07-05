@@ -3,16 +3,18 @@ import { formatMoney } from "@web/helper"
 import { cn } from "@web/lib/utils"
 
 type Props = {
-  netMinor: number
+  // All-time net — the same figure as the pinned Telegram balance.
+  balanceMinor: number
   todayDeltaMinor: number
+  // Month-to-date figures for the tiles below.
   incomeMinor: number
   expenseMinor: number
   currency: string
 }
 
 // The emotional centre of the app: where you stand, right now.
-const BalanceHero = ({ netMinor, todayDeltaMinor, incomeMinor, expenseMinor, currency }: Props) => {
-  const negative = netMinor < 0
+const BalanceHero = ({ balanceMinor, todayDeltaMinor, incomeMinor, expenseMinor, currency }: Props) => {
+  const negative = balanceMinor < 0
   const deltaUp = todayDeltaMinor >= 0
 
   return (
@@ -33,7 +35,7 @@ const BalanceHero = ({ netMinor, todayDeltaMinor, incomeMinor, expenseMinor, cur
             )}
           >
             {negative ? "−" : ""}
-            {formatMoney(Math.abs(netMinor), currency)}
+            {formatMoney(Math.abs(balanceMinor), currency)}
           </span>
         </div>
 
@@ -60,7 +62,7 @@ const BalanceHero = ({ netMinor, todayDeltaMinor, incomeMinor, expenseMinor, cur
         <div className="mt-7 grid grid-cols-2 gap-3">
           <div className="rounded-2xl bg-income-muted/50 p-3.5">
             <div className="flex items-center gap-1.5 text-xs font-medium text-income">
-              <ArrowDownRight className="size-3.5" /> Income
+              <ArrowDownRight className="size-3.5" /> Income this month
             </div>
             <div className="tabular mt-1 text-lg font-semibold text-foreground">
               {formatMoney(incomeMinor, currency)}
@@ -68,7 +70,7 @@ const BalanceHero = ({ netMinor, todayDeltaMinor, incomeMinor, expenseMinor, cur
           </div>
           <div className="rounded-2xl bg-expense-muted/50 p-3.5">
             <div className="flex items-center gap-1.5 text-xs font-medium text-expense">
-              <ArrowUpRight className="size-3.5" /> Spent
+              <ArrowUpRight className="size-3.5" /> Spent this month
             </div>
             <div className="tabular mt-1 text-lg font-semibold text-foreground">
               {formatMoney(expenseMinor, currency)}

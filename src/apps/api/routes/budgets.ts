@@ -6,10 +6,28 @@ import {
   budgetUpdateInputSchema
 } from "@/shared/types"
 import { toMinor } from "@/shared/money"
+import { monthRange } from "@/shared/datetime"
 
 export const budgetsRouter = t.router({
   list: protectedProcedure.query(async ({ ctx }) => {
-    const items = await ctx.repos.budgets.listByAccount(ctx.accountId)
+    const budgets = await ctx.repos.budgets.listByAccount(ctx.accountId)
+    if (!budgets.length) return { items: [] }
+
+    // Month-to-date spend per budget so the dashboard can show progress, not
+    // just the limit. Same range/queries the Telegram alert check uses.
+    const account = await ctx.repos.accounts.findById(ctx.accountId)
+    const range = monthRange(account?.timezone ?? "UTC")
+    const items = await Promise.all(
+      budgets.map(async (budget) => ({
+        ...budget,
+        spentMinor: await ctx.repos.transactions.getCategoryExpenseInRange(
+          ctx.accountId,
+          budget.categoryId,
+          range.from,
+          range.to
+        )
+      }))
+    )
     return { items }
   }),
 

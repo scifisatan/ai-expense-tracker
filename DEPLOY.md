@@ -168,12 +168,27 @@ npm run db:migrate:remote
 ## 7. Deploy
 
 ```bash
-npm run deploy     # applies pending remote migrations, builds, then deploys
+npm run deploy     # builds, applies pending remote migrations, then deploys
 ```
 
-`npm run deploy` runs three steps in order: `db:migrate:remote` → `vite build` → `wrangler
-deploy`. If a migration fails, the build and upload never run, so you can't ship code against
-a stale schema.
+`npm run deploy` runs three steps in order: `vite build` → `db:migrate:remote` → `wrangler
+deploy`. The build runs first so a build failure can't leave the production schema ahead of
+the deployed code; if a migration fails, the upload never runs, so you can't ship code
+against a stale schema.
+
+### Migration compatibility rule
+
+`npm run deploy` builds, then applies remote D1 migrations, then deploys the Worker — so for
+a few seconds the **old** Worker code serves traffic against the **new** schema. Every
+migration must therefore be backward-compatible with the currently-deployed code
+(expand-contract):
+
+- **Safe:** adding tables or columns — the old code simply ignores them.
+- **Not safe in one step:** dropping or renaming a column/table. Wait until a later deploy,
+  after no deployed code references it.
+
+Concrete example: ship code that stops reading a column in one deploy, then drop the column
+in the next.
 
 > **If you deploy via Cloudflare's Git integration (Workers Builds)** rather than running the
 > command locally, set the project's **deploy command** to `npm run deploy` (instead of the

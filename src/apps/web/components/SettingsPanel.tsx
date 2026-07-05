@@ -59,24 +59,36 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState("")
 
-  const saveCurrency = async (currency: string) => {
-    await setCurrency.mutateAsync({ currency })
-    // The dashboard hero, summary stats, and activity rows all format amounts in
-    // the account default currency, so invalidate them too — otherwise they keep
-    // the old symbol until a full page reload.
-    await Promise.all([
-      settingsQuery.refetch(),
-      utils.insights.summary.invalidate(),
-      utils.transactions.list.invalidate()
-    ])
-    toast.success("Default currency updated")
+  // Shared wrapper so no mutation can fail silently — every failure surfaces as
+  // an error toast instead of an unhandled rejection.
+  const attempt = async (action: () => Promise<void>, failure: string) => {
+    try {
+      await action()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : failure)
+    }
   }
 
-  const saveTimezone = async (timezone: string) => {
-    await updateSettings.mutateAsync({ timezone })
-    await settingsQuery.refetch()
-    toast.success("Timezone updated")
-  }
+  const saveCurrency = (currency: string) =>
+    attempt(async () => {
+      await setCurrency.mutateAsync({ currency })
+      // The dashboard hero, summary stats, and activity rows all format amounts in
+      // the account default currency, so invalidate them too — otherwise they keep
+      // the old symbol until a full page reload.
+      await Promise.all([
+        settingsQuery.refetch(),
+        utils.insights.summary.invalidate(),
+        utils.transactions.list.invalidate()
+      ])
+      toast.success("Default currency updated")
+    }, "Couldn't update currency — try again.")
+
+  const saveTimezone = (timezone: string) =>
+    attempt(async () => {
+      await updateSettings.mutateAsync({ timezone })
+      await settingsQuery.refetch()
+      toast.success("Timezone updated")
+    }, "Couldn't update timezone — try again.")
 
   const submitCode = async () => {
     if (!code.trim()) return
@@ -92,44 +104,51 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
     }
   }
 
-  const removeLink = async (chatId: number) => {
-    await unlink.mutateAsync({ chatId })
-    await linksQuery.refetch()
-    toast.success("Disconnected")
-  }
+  const removeLink = (chatId: number) =>
+    attempt(async () => {
+      await unlink.mutateAsync({ chatId })
+      await linksQuery.refetch()
+      toast.success("Disconnected")
+    }, "Couldn't disconnect — try again.")
 
   const addCategory = async () => {
     if (!newCatName.trim()) return
-    await createCategory.mutateAsync({ name: newCatName.trim(), type: newCatType })
-    setNewCatName("")
-    await Promise.all([categoriesQuery.refetch(), utils.categories.list.invalidate()])
-    toast.success("Category added")
+    await attempt(async () => {
+      await createCategory.mutateAsync({ name: newCatName.trim(), type: newCatType })
+      setNewCatName("")
+      await Promise.all([categoriesQuery.refetch(), utils.categories.list.invalidate()])
+      toast.success("Category added")
+    }, "Couldn't add category — try again.")
   }
 
-  const removeCategory = async (id: number) => {
-    await deleteCategory.mutateAsync({ id })
-    await Promise.all([categoriesQuery.refetch(), utils.categories.list.invalidate()])
-    toast.success("Category removed")
-  }
+  const removeCategory = (id: number) =>
+    attempt(async () => {
+      await deleteCategory.mutateAsync({ id })
+      await Promise.all([categoriesQuery.refetch(), utils.categories.list.invalidate()])
+      toast.success("Category removed")
+    }, "Couldn't remove category — try again.")
 
   const addBudget = async () => {
     const amount = Number(newBudgetAmount)
     if (!Number.isFinite(amount) || amount <= 0) return
-    await createBudget.mutateAsync({
-      amount,
-      categoryId: newBudgetCategory === OVERALL_BUDGET ? null : Number(newBudgetCategory)
-    })
-    setNewBudgetAmount("")
-    setNewBudgetCategory(OVERALL_BUDGET)
-    await budgetsQuery.refetch()
-    toast.success("Budget saved")
+    await attempt(async () => {
+      await createBudget.mutateAsync({
+        amount,
+        categoryId: newBudgetCategory === OVERALL_BUDGET ? null : Number(newBudgetCategory)
+      })
+      setNewBudgetAmount("")
+      setNewBudgetCategory(OVERALL_BUDGET)
+      await Promise.all([budgetsQuery.refetch(), utils.budgets.list.invalidate()])
+      toast.success("Budget saved")
+    }, "Couldn't save budget — try again.")
   }
 
-  const removeBudget = async (id: number) => {
-    await deleteBudget.mutateAsync({ id })
-    await budgetsQuery.refetch()
-    toast.success("Budget removed")
-  }
+  const removeBudget = (id: number) =>
+    attempt(async () => {
+      await deleteBudget.mutateAsync({ id })
+      await Promise.all([budgetsQuery.refetch(), utils.budgets.list.invalidate()])
+      toast.success("Budget removed")
+    }, "Couldn't remove budget — try again.")
 
   const confirmDelete = async () => {
     try {
@@ -371,8 +390,27 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
           <TabsContent value="telegram" className="mt-6 flex flex-col gap-2">
             <Label htmlFor="settings-code">Connect Telegram</Label>
             <p className="text-xs text-muted-foreground">
-              Send <code className="rounded bg-muted px-1 py-0.5 tabular">/link</code> to the bot,
-              then enter the code it gives you.
+              {settings?.botUsername ? (
+                <>
+                  Open{" "}
+                  <a
+                    href={`https://t.me/${settings.botUsername}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-primary underline underline-offset-2"
+                  >
+                    @{settings.botUsername}
+                  </a>{" "}
+                  in Telegram, send{" "}
+                  <code className="rounded bg-muted px-1 py-0.5 tabular">/link</code>, then enter
+                  the code it gives you here.
+                </>
+              ) : (
+                <>
+                  Send <code className="rounded bg-muted px-1 py-0.5 tabular">/link</code> to the
+                  bot, then enter the code it gives you.
+                </>
+              )}
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input

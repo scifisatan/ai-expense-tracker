@@ -38,9 +38,16 @@ export const ledgerRouter = t.router({
         groqApiKey: ctx.env.GROQ_API_KEY ?? "",
       });
 
+      // Fetch categories up front so the AI only picks from names that already
+      // exist (categories are created deliberately in Settings, never by the AI).
+      const categories = await ctx.repos.categories.listByAccount(ctx.accountId);
+
       let extracted: TransactionsExtraction;
       try {
-        extracted = await ai.extractTransactions(input.text, localDateString(timezone));
+        extracted = await ai.extractTransactions(input.text, localDateString(timezone), {
+          expense: categories.filter((c) => c.type === "Expense").map((c) => c.name),
+          income: categories.filter((c) => c.type === "Income").map((c) => c.name),
+        });
       } catch (error) {
         // The AI service already retried; degrade gracefully instead of surfacing a
         // 500 to the web NL box / Telegram bot.
@@ -51,46 +58,36 @@ export const ledgerRouter = t.router({
         return { items: [], net: 0, newBalance: null, currency, insertedIds: [], reason: "NO_ITEMS" as const };
       }
 
-      // Seed a mutable lookup from existing categories so repeated hints in one
-      // batch reuse (and don't re-create) the same category.
-      const categories = await ctx.repos.categories.listByAccount(ctx.accountId);
+      // Match-only resolution: an AI hint either matches an existing category
+      // (case-insensitively) or the item stays uncategorized. New categories are
+      // never created here.
       const categoryByKey = new Map<string, Category>(
         categories.map((c) => [categoryKey(c.type, c.name), c]),
       );
 
-      const resolveCategoryId = async (
+      const resolveCategory = (
         hint: string | undefined,
         type: "Income" | "Expense",
-      ): Promise<number | null> => {
+      ): Category | null => {
         const name = hint?.trim();
         if (!name) return null;
-        const existing = categoryByKey.get(categoryKey(type, name));
-        if (existing) return existing.id;
-        const [created] = await ctx.repos.categories.create(ctx.accountId, { name, type });
-        categoryByKey.set(categoryKey(type, name), created);
-        return created.id;
+        return categoryByKey.get(categoryKey(type, name)) ?? null;
       };
 
-      const items: Array<{
-        amountMinor: number;
-        type: "Income" | "Expense";
-        note: string;
-        currency: string;
-        categoryId: number | null;
-        occurredAt?: string;
-      }> = [];
-      for (const item of extracted.items) {
-        items.push({
+      const items = extracted.items.map((item) => {
+        const category = resolveCategory(item.category, item.type);
+        return {
           amountMinor: Math.abs(toMinor(item.amount, currency)),
           type: item.type,
           note: item.note,
           currency,
-          categoryId: await resolveCategoryId(item.category, item.type),
+          categoryId: category?.id ?? null,
+          categoryName: category?.name ?? null,
           occurredAt: item.occurredAt
             ? (normalizeBackdate(item.occurredAt, timezone) ?? undefined)
             : undefined,
-        });
-      }
+        };
+      });
 
       const inserted = await ctx.repos.transactions.insertLedger({
         accountId: ctx.accountId,
@@ -100,8 +97,11 @@ export const ledgerRouter = t.router({
       });
 
       const newBalance = await ctx.repos.transactions.getNetBalance(ctx.accountId);
-      await publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, currency);
-      await checkBudgetAlerts(ctx, items);
+      ctx.waitUntil(
+        publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, currency)
+          .catch((error) => log.api.error("publish-balance", error)),
+      );
+      ctx.waitUntil(checkBudgetAlerts(ctx, items));
 
       const net = items.reduce(
         (sum, item) => sum + (item.type === "Income" ? item.amountMinor : -item.amountMinor),
@@ -116,6 +116,6 @@ export const ledgerRouter = t.router({
     const currency = account?.defaultCurrency ?? "USD";
     const newBalance = await ctx.repos.transactions.getNetBalance(ctx.accountId);
     await publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, currency);
-    return { newBalance };
+    return { newBalance, currency };
   }),
 });

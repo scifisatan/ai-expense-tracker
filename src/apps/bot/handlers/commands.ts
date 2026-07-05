@@ -78,10 +78,18 @@ export const registerCommandHandlers = (bot: Bot<BotContext>) => {
     });
   });
 
-  bot.command("balance", async (ctx) => {
+  // Refresh the pinned balance and reply in-chat too — editing the pin alone is
+  // invisible when the pinned message already exists.
+  const sendBalance = async (ctx: BotContext) => {
     if (!(await requireLinked(ctx))) return;
-    await ctx.caller.ledger.refreshBalance();
-  });
+    const { newBalance, currency } = await ctx.caller.ledger.refreshBalance();
+    await ctx.reply(msg.balance(newBalance, currency), {
+      parse_mode: "Markdown",
+      reply_markup: getChatKeyboard(),
+    });
+  };
+
+  bot.command("balance", sendBalance);
 
   bot.command("transactions", async (ctx) =>
     sendRecentTransactions(ctx, ctx.chat.id),
@@ -98,10 +106,7 @@ export const registerCommandHandlers = (bot: Bot<BotContext>) => {
 
   bot.command("help", async (ctx) => sendHelp(ctx, ctx.chat.id));
 
-  bot.hears(BUTTON_BALANCE_RE, async (ctx) => {
-    if (!(await requireLinked(ctx))) return;
-    await ctx.caller.ledger.refreshBalance();
-  });
+  bot.hears(BUTTON_BALANCE_RE, sendBalance);
 
   bot.hears(BUTTON_TRANSACTIONS_RE, async (ctx) =>
     sendRecentTransactions(ctx, ctx.chat.id),
