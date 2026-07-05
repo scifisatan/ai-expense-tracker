@@ -3,7 +3,26 @@ import { createGroq } from "@ai-sdk/groq"
 import { TransactionsExtraction, transactionsSchema } from "@/shared/types"
 import { log } from "@/utils/logger"
 
-const buildSystemPrompt = (today: string): string => `Extract every monetary transaction mentioned in the message.
+const buildCategoryRule = (categories: { expense: string[]; income: string[] }): string => {
+  const lines = ["- category is OPTIONAL."]
+  if (categories.expense.length) {
+    lines.push(`  For Expense items choose ONLY from: ${categories.expense.join(", ")}.`)
+  } else {
+    lines.push("  OMIT category for Expense items.")
+  }
+  if (categories.income.length) {
+    lines.push(`  For Income items choose ONLY from: ${categories.income.join(", ")}.`)
+  } else {
+    lines.push("  OMIT category for Income items.")
+  }
+  lines.push("  Copy the name exactly as written. If none fits, OMIT category.")
+  return lines.join("\n")
+}
+
+const buildSystemPrompt = (
+  today: string,
+  categories: { expense: string[]; income: string[] },
+): string => `Extract every monetary transaction mentioned in the message.
 
 Today's date is ${today} (ISO YYYY-MM-DD).
 
@@ -14,7 +33,7 @@ Rules:
 - amount must be a positive number; decimals are allowed (strip currency symbols).
 - type must be either "Expense" or "Income".
 - note must describe the specific transaction amount it appears next to or on the same line as.
-- category is OPTIONAL: a short label like "Food", "Transport", "Shopping", "Bills", "Salary". Omit if unsure.
+${buildCategoryRule(categories)}
 - occurredAt is OPTIONAL: include it as YYYY-MM-DD ONLY when the message references a date
   (e.g. "yesterday", "last Friday", "on the 3rd"); resolve it relative to today's date above.
   OMIT occurredAt entirely when no date is mentioned.
@@ -28,10 +47,14 @@ export const createAiService = (options: {
   groqApiKey: string
 }) => {
   return {
-    async extractTransactions(message: string, today: string): Promise<TransactionsExtraction> {
+    async extractTransactions(
+      message: string,
+      today: string,
+      categories: { expense: string[]; income: string[] },
+    ): Promise<TransactionsExtraction> {
       const groq = createGroq({ apiKey: options.groqApiKey })
       const model = groq(options.model)
-      const system = buildSystemPrompt(today)
+      const system = buildSystemPrompt(today, categories)
 
       log.ai.debug("ai.extractTransactions.model", options.model)
       log.ai.debug("ai.extractTransactions.prompt", message)

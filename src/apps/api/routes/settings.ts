@@ -14,10 +14,24 @@ const isValidTimezone = (tz: string): boolean => {
   }
 }
 
+// The bot's @username, read from the cached getMe payload in the BOT_INFO KV.
+// Lets the web link users straight to the bot (t.me/<username>).
+const getBotUsername = async (kv: KVNamespace): Promise<string | null> => {
+  try {
+    const raw = await kv.get("BOT_INFO")
+    if (!raw) return null
+    const info = JSON.parse(raw) as { username?: string }
+    return info.username ?? null
+  } catch {
+    return null
+  }
+}
+
 export const settingsRouter = t.router({
   get: protectedProcedure.query(async ({ ctx }) => {
     const account = await ctx.repos.accounts.findById(ctx.accountId)
     const txCount = await ctx.repos.transactions.countByAccount(ctx.accountId)
+    const botUsername = await getBotUsername(ctx.env.BOT_INFO)
 
     return {
       defaultCurrency: account?.defaultCurrency ?? "USD",
@@ -27,6 +41,7 @@ export const settingsRouter = t.router({
       // Currency is single-per-account with no FX, so it locks once any transaction
       // exists — otherwise the balance would mix currencies incoherently.
       currencyLocked: txCount > 0,
+      botUsername,
     }
   }),
 

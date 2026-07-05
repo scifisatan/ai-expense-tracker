@@ -43,7 +43,11 @@ export const registerMessageHandlers = (bot: Bot<BotContext>) => {
       }
 
       if (!result.items.length || result.newBalance === null) {
-        await ctx.api.deleteMessage(chatId, processingMsg.message_id).catch(() => {})
+        // Never go silent: the user watched the "one sec…" bubble — tell them
+        // what happened and how to phrase it so it works next time.
+        await ctx.api.editMessageText(chatId, processingMsg.message_id, msg.nothingFound(), {
+          parse_mode: "Markdown",
+        })
         return
       }
 

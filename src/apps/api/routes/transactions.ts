@@ -9,11 +9,24 @@ import {
 import { publishBalance } from "@api/lib/ledger";
 import { checkBudgetAlerts } from "@api/lib/budgets";
 import { toMinor } from "@/shared/money";
-import { resolvePeriod } from "@/shared/datetime";
+import { log } from "@/utils/logger";
+import { normalizeBackdate, resolvePeriod } from "@/shared/datetime";
 
 const accountCurrency = async (ctx: { repos: { accounts: { findById: (id: string) => Promise<{ defaultCurrency: string } | undefined> } }; accountId: string }) => {
   const account = await ctx.repos.accounts.findById(ctx.accountId);
   return account?.defaultCurrency ?? "USD";
+};
+
+// Client-supplied dates (bare "YYYY-MM-DD" from the web date picker) must be
+// normalized to the DB's UTC "YYYY-MM-DD HH:MM:SS" shape, anchored in the
+// account timezone, or range queries would misbucket them.
+const normalizeOccurredAt = async (
+  ctx: { repos: { accounts: { findById: (id: string) => Promise<{ timezone: string | null } | undefined> } }; accountId: string },
+  occurredAt: string | undefined,
+): Promise<string | undefined> => {
+  if (!occurredAt) return undefined;
+  const account = await ctx.repos.accounts.findById(ctx.accountId);
+  return normalizeBackdate(occurredAt, account?.timezone ?? "UTC") ?? undefined;
 };
 
 export const transactionsRouter = t.router({
@@ -53,15 +66,18 @@ export const transactionsRouter = t.router({
         type: input.type,
         categoryId: input.categoryId ?? null,
         note: input.note ?? null,
-        occurredAt: input.occurredAt,
+        occurredAt: await normalizeOccurredAt(ctx, input.occurredAt),
         source: "web",
       });
 
       const newBalance = await ctx.repos.transactions.getNetBalance(ctx.accountId);
-      await publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, currency);
-      await checkBudgetAlerts(ctx, [
+      ctx.waitUntil(
+        publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, currency)
+          .catch((error) => log.api.error("publish-balance", error)),
+      );
+      ctx.waitUntil(checkBudgetAlerts(ctx, [
         { type: input.type, categoryId: input.categoryId ?? null, amountMinor: created.amountMinor },
-      ]);
+      ]));
 
       return { ok: true, transaction: created, newBalance };
     }),
@@ -84,21 +100,29 @@ export const transactionsRouter = t.router({
       // Pin to the account default currency; ignore any currency override.
       const currency = await accountCurrency(ctx);
 
+      const amountMinor =
+        input.amount !== undefined
+          ? Math.abs(toMinor(input.amount, currency))
+          : current.amountMinor;
+      const type = input.type ?? current.type;
+      const categoryId =
+        input.categoryId !== undefined ? input.categoryId : current.categoryId;
+
       await ctx.repos.transactions.updateById(ctx.accountId, input.id, {
-        amountMinor:
-          input.amount !== undefined
-            ? Math.abs(toMinor(input.amount, currency))
-            : current.amountMinor,
+        amountMinor,
         currency,
-        type: input.type ?? current.type,
-        categoryId:
-          input.categoryId !== undefined ? input.categoryId : current.categoryId,
+        type,
+        categoryId,
         note: input.note !== undefined ? input.note : current.note,
-        occurredAt: input.occurredAt ?? current.occurredAt,
+        occurredAt: (await normalizeOccurredAt(ctx, input.occurredAt)) ?? current.occurredAt,
       });
 
       const newBalance = await ctx.repos.transactions.getNetBalance(ctx.accountId);
-      await publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, currency);
+      ctx.waitUntil(
+        publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, currency)
+          .catch((error) => log.api.error("publish-balance", error)),
+      );
+      ctx.waitUntil(checkBudgetAlerts(ctx, [{ type, categoryId, amountMinor }]));
 
       return { ok: true, newBalance };
     }),
@@ -114,7 +138,10 @@ export const transactionsRouter = t.router({
       await ctx.repos.transactions.deleteByIds(ctx.accountId, input.ids);
 
       const newBalance = await ctx.repos.transactions.getNetBalance(ctx.accountId);
-      await publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, await accountCurrency(ctx));
+      ctx.waitUntil(
+        publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, await accountCurrency(ctx))
+          .catch((error) => log.api.error("publish-balance", error)),
+      );
 
       return { ok: true, newBalance };
     }),

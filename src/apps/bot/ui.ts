@@ -66,6 +66,17 @@ type LedgerItem = {
   amountMinor: number
   type: "Income" | "Expense"
   note?: string | null
+  categoryName?: string | null
+  occurredAt?: string
+}
+
+// "Jul 3" from a DB timestamp ("YYYY-MM-DD HH:MM:SS") or bare date. Falls back
+// to the raw date part if parsing fails.
+const shortDate = (dbTimestamp: string): string => {
+  const datePart = dbTimestamp.slice(0, 10)
+  const parsed = new Date(`${datePart}T12:00:00Z`)
+  if (Number.isNaN(parsed.getTime())) return datePart
+  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })
 }
 
 type RecentTransaction = {
@@ -144,8 +155,15 @@ export const msg = {
   ): string => {
     const count = items.length
     const lines = items.map((item) => {
-      const note = item.note ? ` · ${escapeMd(item.note)}` : ""
-      return `• ${signedAmount(item, currency)}${note}`
+      // Show what the AI decided (note, category, backdate) so mistakes are
+      // catchable at a glance — Undo is right there.
+      const parts = [
+        item.note ? escapeMd(item.note) : null,
+        item.categoryName ? escapeMd(item.categoryName) : null,
+        item.occurredAt ? shortDate(item.occurredAt) : null,
+      ].filter(Boolean)
+      const detail = parts.length ? ` · ${parts.join(" · ")}` : ""
+      return `• ${signedAmount(item, currency)}${detail}`
     })
     const netSign = net >= 0 ? "+" : "-"
     return [
@@ -208,6 +226,14 @@ export const msg = {
       "`/balance` — Show your current balance",
       "`/transactions` — See recent activity",
       "`/month` — This month's income, spending & net",
+    ].join("\n"),
+
+  // Shown when free text parsed fine but contained no recognizable amounts.
+  nothingFound: (): string =>
+    [
+      "🤔 I couldn't find an amount in that.",
+      "",
+      "Try including a number — like `Spent 12.50 on coffee` or `Got 500 salary` — and I'll log it right away.",
     ].join("\n"),
 
   // Shown when the account hits its daily AI extraction limit.

@@ -107,7 +107,7 @@ const ActivityFeed = ({ transactions, categories, currency, isLoading, onUpdate,
             </p>
             <p className="mt-0.5 text-sm text-muted-foreground">
               {transactions.length === 0
-                ? "Add your first one with the box above."
+                ? "Add your first one with the box above — or connect Telegram in Settings to log from chat."
                 : "Try a different search or filter."}
             </p>
           </div>

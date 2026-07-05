@@ -53,6 +53,7 @@ apiRoutes.all("/*", async (c, next) => {
       env: c.env,
       accountId,
       actor: "web" as const,
+      waitUntil: (p: Promise<unknown>) => c.executionCtx.waitUntil(p),
     }),
   });
 

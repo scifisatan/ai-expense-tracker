@@ -21,14 +21,16 @@ export function useTransaction(onMutationSuccess?: () => void) {
   const deleteMutation = trpc.transactions.delete.useMutation()
   const ingestMutation = trpc.ledger.ingestText.useMutation()
 
-  const [status, setStatus] = useState("")
+  // Structured so consumers can pick the right toast variant instead of
+  // guessing success/failure from the message text.
+  const [status, setStatus] = useState<{ kind: "success" | "error"; text: string } | null>(null)
 
   const transactions: Transaction[] = txData?.items ?? []
   const categories = categoriesData?.items ?? []
 
-  const flash = (msg: string, ms = 2500) => {
-    setStatus(msg)
-    setTimeout(() => setStatus(""), ms)
+  const flash = (kind: "success" | "error", text: string, ms = 2500) => {
+    setStatus({ kind, text })
+    setTimeout(() => setStatus(null), ms)
   }
 
   const loadData = useCallback(async () => {
@@ -45,11 +47,11 @@ export function useTransaction(onMutationSuccess?: () => void) {
   }) => {
     try {
       await createMutation.mutateAsync(input)
-      flash("Added ✓")
+      flash("success", "Added ✓")
       await loadData()
       return true
     } catch {
-      flash("Failed to add.", 3000)
+      flash("error", "Failed to add.", 3000)
       return false
     }
   }
@@ -58,22 +60,22 @@ export function useTransaction(onMutationSuccess?: () => void) {
     try {
       const result = await ingestMutation.mutateAsync({ text })
       if (result.reason === "RATE_LIMITED") {
-        flash("Daily AI limit reached — try again tomorrow or add entries manually.", 4000)
+        flash("error", "Daily AI limit reached — try again tomorrow or add entries manually.", 4000)
         return false
       }
       if (result.reason === "AI_ERROR") {
-        flash("AI couldn't process that right now — please try again.", 3500)
+        flash("error", "AI couldn't process that right now — please try again.", 3500)
         return false
       }
       if (!result.items.length) {
-        flash("No transactions found in that text.", 3000)
+        flash("error", "No transactions found in that text.", 3000)
         return false
       }
-      flash(`Added ${result.items.length} transaction(s) ✓`)
+      flash("success", `Added ${result.items.length} transaction(s) ✓`)
       await loadData()
       return true
     } catch {
-      flash("AI couldn't process that right now — please try again.", 3500)
+      flash("error", "AI couldn't process that right now — please try again.", 3500)
       return false
     }
   }
@@ -85,22 +87,23 @@ export function useTransaction(onMutationSuccess?: () => void) {
         amount: patch.amount,
         type: patch.type,
         categoryId: patch.categoryId,
-        note: patch.note === undefined ? undefined : patch.note
+        note: patch.note === undefined ? undefined : patch.note,
+        occurredAt: patch.occurredAt
       })
-      flash("Saved ✓")
+      flash("success", "Saved ✓")
       await loadData()
     } catch {
-      flash("Failed to update.", 3000)
+      flash("error", "Failed to update.", 3000)
     }
   }
 
   const deleteTransactions = async (ids: number[]) => {
     try {
       await deleteMutation.mutateAsync({ ids })
-      flash(`Deleted ${ids.length} transaction(s) ✓`)
+      flash("success", `Deleted ${ids.length} transaction(s) ✓`)
       await loadData()
     } catch {
-      flash("Failed to delete.", 3000)
+      flash("error", "Failed to delete.", 3000)
     }
   }
 

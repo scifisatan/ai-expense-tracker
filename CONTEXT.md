@@ -126,21 +126,35 @@ Unlinked chats are guided to connect instead of silently tracked.
 ```txt
 text → ledger.ingestText (protected, account-scoped)
      → consume per-account daily AI quota (KV); over limit → reason:"RATE_LIMITED"
+     → fetch the account's categories; their names go into the extraction prompt
      → Groq extraction via Vercel AI SDK (generateObject, Zod schema)
      → items: { amount(decimal), type, note, category? }; empty → reason:"NO_ITEMS"
-     → convert amounts to minor units; resolve category hints to category_id
+     → convert amounts to minor units; match category hints to EXISTING categories
+       (case-insensitive, match-only — the AI never creates categories; unmatched
+       hints stay uncategorized)
      → insert transactions (source = "telegram" for bot, "web" for web)
      → recompute net balance
-     → publish/pin balance to every linked Telegram chat
+     → background (ctx.waitUntil): publish/pin balance to every linked Telegram
+       chat + check budget alerts — the mutation response never waits on Telegram
 ```
 
 ### Manual entry (web)
 `transactions.create` takes a decimal amount + type + optional category/note/date, converts
 to minor units using the account's default currency, inserts, and republishes the balance.
+Like all mutations, the Telegram publish + budget-alert check run via `ctx.waitUntil`
+(exposed on the tRPC context), off the request's critical path. `transactions.update`
+also re-checks budget alerts with the post-edit values, so an edit that crosses a
+threshold alerts too. `ledger.refreshBalance` is the exception: publishing *is* its
+purpose, so it stays awaited.
 
 ### Balance publishing — `src/apps/api/lib/ledger.ts`
 `publishBalance` looks up all `telegram_links` for the account and sends + pins a formatted
 balance message to each chat. No-op if the account has no linked chat or no bot token.
+
+### Webhook failure reply — `src/apps/bot/index.ts`
+Updates are ACKed immediately and processed in `waitUntil`; if processing throws, the bot
+sends a best-effort "wasn't recorded, try again" reply to the originating chat instead of
+failing silently (Telegram won't retry — the user is the retry mechanism).
 
 ---
 
@@ -229,5 +243,8 @@ on a custom domain (`routes` in `wrangler.jsonc`).
   single-use, short-TTL, high-entropy link codes. Robust limiting needs KV/Durable Objects.
 - Deleting a category does **not** reassign transactions that referenced it (they show no
   category).
-- New accounts default to **USD** (changeable per-account in Settings).
-- No recurring transactions / budgets yet.
+- New accounts default to **USD** (changeable per-account in Settings until the first
+  transaction; locked after that).
+- No recurring transactions yet.
+- Deploys build first, then migrate, then deploy (see `DEPLOY.md` — migrations must be
+  backward-compatible with currently deployed code, expand-contract style).

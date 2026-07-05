@@ -6,7 +6,11 @@ import type { TelegramIdentity } from "@api/trpc"
 
 export function createBotCaller(
   env: CloudflareBindings,
-  context: { accountId: string | null; telegram: TelegramIdentity }
+  context: {
+    accountId: string | null
+    telegram: TelegramIdentity
+    waitUntil: (promise: Promise<unknown>) => void
+  }
 ) {
   const db = createDb(env.DB)
   const repos = createRepositories(db)
@@ -17,7 +21,8 @@ export function createBotCaller(
     env,
     accountId: context.accountId,
     actor: "bot",
-    telegram: context.telegram
+    telegram: context.telegram,
+    waitUntil: context.waitUntil
   })
 }
 

@@ -18,6 +18,9 @@ export type ApiContext = {
   repos: ApiRepositories
   accountId: string | null
   actor: "web" | "bot"
+  // Registers background work with the Workers execution context so responses
+  // aren't blocked on side effects.
+  waitUntil: (promise: Promise<unknown>) => void
   // Present only for bot-originated calls; carries the Telegram identity even when
   // the chat is not yet linked to an account (used by the link-code flow).
   telegram?: TelegramIdentity | null
