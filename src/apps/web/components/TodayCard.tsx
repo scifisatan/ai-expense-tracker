@@ -21,7 +21,7 @@ import type { AllocationKind } from "@/shared/types"
 import DepositSavingsDialog from "./DepositSavingsDialog"
 
 type Props = {
-  onNavigate?: (view: "dashboard" | "transactions" | "wishlist" | "settings") => void
+  onNavigate?: (view: "dashboard" | "pacer" | "savings" | "transactions" | "wishlist" | "settings") => void
 }
 
 // The core Pacer dashboard metrics: displays today's remaining allowance,
@@ -59,8 +59,6 @@ const TodayCard = ({ onNavigate }: Props) => {
   }) => {
     if (prefill) {
       setStartPrefill(prefill)
-    } else {
-      setStartPrefill(null)
     }
     setStartOpen(true)
   }
@@ -69,7 +67,6 @@ const TodayCard = ({ onNavigate }: Props) => {
     const salary = Number(quickSalary)
     const now = new Date()
     const today = now.toISOString().slice(0, 10)
-    // Default to last day of current calendar month
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
     const endIso = endOfMonth.toISOString().slice(0, 10)
 
@@ -97,10 +94,10 @@ const TodayCard = ({ onNavigate }: Props) => {
                 <Compass className="size-6" />
               </div>
               <div>
-                <h2 className="text-xl font-bold tracking-tight text-foreground">
+                <h2 className="text-xl font-semibold tracking-tight text-foreground">
                   Start your monthly spending pace
                 </h2>
-                <p className="mt-0.5 text-sm text-muted-foreground">
+                <p className="mt-0.5 text-xs text-muted-foreground">
                   Pacer calculates your daily allowance from your salary after fixed commitments.
                 </p>
               </div>
@@ -108,7 +105,7 @@ const TodayCard = ({ onNavigate }: Props) => {
 
             <Button
               onClick={() => handleStartWithPrefill()}
-              className="gap-1.5 rounded-2xl px-5 text-sm font-semibold"
+              className="gap-1.5 rounded-2xl px-5 text-xs font-semibold"
             >
               <Compass className="size-4" /> Start cycle
             </Button>
@@ -125,11 +122,11 @@ const TodayCard = ({ onNavigate }: Props) => {
                 placeholder="Monthly salary / income (e.g. 50000)"
                 value={quickSalary}
                 onChange={(e) => setQuickSalary(e.target.value)}
-                className="tabular h-12 flex-1 rounded-2xl border bg-background px-4 text-base font-semibold text-foreground focus:border-primary focus:outline-none"
+                className="tabular h-11 flex-1 rounded-2xl border bg-background px-4 text-sm font-semibold text-foreground focus:border-primary focus:outline-none"
               />
               <Button
                 onClick={handleQuickStart}
-                className="h-12 gap-1.5 rounded-2xl px-6 text-sm font-bold"
+                className="h-11 gap-1.5 rounded-2xl px-6 text-xs font-semibold"
               >
                 <Compass className="size-4" />
                 Start pacing
@@ -144,23 +141,15 @@ const TodayCard = ({ onNavigate }: Props) => {
                     key={amt}
                     type="button"
                     onClick={() => setQuickSalary(String(amt))}
-                    className="rounded-full border bg-background px-3 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="rounded-full bg-background border px-3 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
                   >
-                    +{amt.toLocaleString()}
+                    {amt.toLocaleString()}
                   </button>
                 ))}
               </div>
-
               <button
                 type="button"
-                onClick={() =>
-                  handleStartWithPrefill({
-                    startDate: new Date().toISOString().slice(0, 10),
-                    gross: Number(quickSalary) || 0,
-                    sweepPct: 50,
-                    allocations: []
-                  })
-                }
+                onClick={() => handleStartWithPrefill()}
                 className="flex items-center gap-1 text-xs font-semibold text-primary underline-offset-2 hover:underline"
               >
                 <Sliders className="size-3.5" /> Customize fixed commitments (Rent, Savings)
@@ -210,8 +199,7 @@ const TodayCard = ({ onNavigate }: Props) => {
           <CycleReviewDialog
             open={reviewOpen}
             onOpenChange={setReviewOpen}
-            cycleId={lastCompleted.cycle.id}
-            onRollover={(prefill) => {
+            onStartNextCycle={(prefill) => {
               setReviewOpen(false)
               handleStartWithPrefill(prefill)
             }}
