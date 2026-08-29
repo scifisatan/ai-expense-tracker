@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react"
 import { toast } from "sonner"
-import { Wallet, Compass, ArrowRight, Plus, Trash2, Home, PiggyBank, ShieldCheck, Zap } from "lucide-react"
+import { Wallet, Compass, ArrowRight, Plus, Trash2, Home, PiggyBank, Zap } from "lucide-react"
 import { trpc } from "@web/trpc"
 import { Button } from "@web/components/ui/button"
 import { Label } from "@web/components/ui/label"
@@ -26,8 +26,7 @@ type AllocationItem = {
 const PRESETS = [
   { id: "rent", kind: "fixed" as AllocationKind, label: "Rent / Housing", icon: Home },
   { id: "savings", kind: "savings" as AllocationKind, label: "Savings Vault", icon: PiggyBank },
-  { id: "bills", kind: "fixed" as AllocationKind, label: "Utilities & Bills", icon: Zap },
-  { id: "needs", kind: "needs_reserve" as AllocationKind, label: "Needs Reserve", icon: ShieldCheck }
+  { id: "bills", kind: "fixed" as AllocationKind, label: "Utilities & Bills", icon: Zap }
 ]
 
 const OnboardingScreen = ({ onDone }: { onDone: () => void }) => {
@@ -208,7 +207,7 @@ const OnboardingScreen = ({ onDone }: { onDone: () => void }) => {
           <div className="space-y-5">
             {/* Salary Input */}
             <div className="space-y-2">
-              <Label htmlFor="onboarding-salary" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <Label htmlFor="onboarding-salary" className="text-xs font-bold text-muted-foreground">
                 Monthly Net Salary ({currency})
               </Label>
               <Input
@@ -241,8 +240,8 @@ const OnboardingScreen = ({ onDone }: { onDone: () => void }) => {
             <div className="space-y-3 rounded-2xl border bg-muted/30 p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                    Fixed Bills & Off-The-Top Allocations
+                  <h3 className="text-xs font-bold text-foreground">
+                    Fixed bills & off-the-top allocations
                   </h3>
                   <p className="text-[11px] text-muted-foreground">
                     Protected funds subtracted before calculating your daily pace.

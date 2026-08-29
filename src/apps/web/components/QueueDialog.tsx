@@ -10,7 +10,7 @@ type Props = {
 const QueueDialog = ({ open, onOpenChange, currency }: Props) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-xl md:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Priority Wishlist & Goals</DialogTitle>
           <DialogDescription>

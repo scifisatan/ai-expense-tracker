@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Plus, Trash2, Home, Heart, PiggyBank, Tv, Zap, MoreHorizontal } from "lucide-react"
+import { Plus, Trash2, Home, Heart, PiggyBank, Tv, Zap, MoreHorizontal, Gift } from "lucide-react"
 import type { AllocationKind } from "@/shared/types"
 import {
   Dialog,
@@ -30,6 +30,7 @@ export type AllocationPreset = {
 export const PRESET_ALLOCATIONS: AllocationPreset[] = [
   { id: "rent", kind: "fixed", label: "Rent / Housing", icon: Home },
   { id: "savings", kind: "savings", label: "Savings Vault", icon: PiggyBank },
+  { id: "want_fund", kind: "other", label: "Wishlist / Want Budget", icon: Gift },
   { id: "utilities", kind: "fixed", label: "Utilities & Bills", icon: Zap },
   { id: "subscriptions", kind: "subscriptions", label: "Subscriptions", icon: Tv },
   { id: "family", kind: "family", label: "Family Support", icon: Heart },
@@ -78,8 +79,8 @@ const defaultAllocation = (presetId = "rent"): AllocationDraft => {
 
 const defaultEndIso = (startStr?: string) => {
   const base = startStr ? new Date(startStr) : new Date()
-  base.setDate(base.getDate() + 29)
-  return base.toISOString().slice(0, 10)
+  const lastDay = new Date(base.getFullYear(), base.getMonth() + 1, 0)
+  return lastDay.toISOString().slice(0, 10)
 }
 
 const StartCycleDialog = ({ open, onOpenChange, initialValues, onStart }: Props) => {
@@ -127,15 +128,8 @@ const StartCycleDialog = ({ open, onOpenChange, initialValues, onStart }: Props)
     }
   }, [open, initialValues])
 
-  const grossValue = Number(gross)
-  const grossValid = Boolean(gross) && Number.isFinite(grossValue) && grossValue > 0
-  const datesValid = Boolean(startDate) && Boolean(endDate) && endDate >= startDate
-  const canSubmit = grossValid && datesValid && !saving
-
-  const handlePresetChange = (index: number, presetId: string) => {
-    const preset = PRESET_ALLOCATIONS.find((p) => p.id === presetId)
-    if (!preset) return
-
+  const handlePresetSelect = (index: number, presetId: string) => {
+    const preset = PRESET_ALLOCATIONS.find((p) => p.id === presetId) ?? PRESET_ALLOCATIONS[0]!
     setAllocations((prev) =>
       prev.map((a, i) => {
         if (i !== index) return a
@@ -166,6 +160,12 @@ const StartCycleDialog = ({ open, onOpenChange, initialValues, onStart }: Props)
     setAllocations((prev) => [...prev, defaultAllocation()])
   }
 
+  const grossValue = Number(gross) || 0
+  const totalAllocated = allocations.reduce((sum, a) => sum + (Number(a.amount) || 0), 0)
+  const remainingPool = Math.max(0, grossValue - totalAllocated)
+
+  const canSubmit = grossValue > 0 && startDate && endDate && !saving
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!canSubmit) return
@@ -190,7 +190,7 @@ const StartCycleDialog = ({ open, onOpenChange, initialValues, onStart }: Props)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-xl md:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Start a pacing cycle</DialogTitle>
           <DialogDescription>
@@ -199,25 +199,66 @@ const StartCycleDialog = ({ open, onOpenChange, initialValues, onStart }: Props)
         </DialogHeader>
 
         <form onSubmit={submit} className="grid gap-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor="cycle-start">Start date</Label>
-              <Input
-                id="cycle-start"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="cycle-start">Start date</Label>
+                <Input
+                  id="cycle-start"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="cycle-end">End date</Label>
+                <Input
+                  id="cycle-end"
+                  type="date"
+                  min={startDate}
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </div>
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="cycle-end">End date</Label>
-              <Input
-                id="cycle-end"
-                type="date"
-                min={startDate}
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
+
+            {/* Quick Date Presets */}
+            <div className="flex flex-wrap gap-1.5 pt-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const d = new Date(startDate)
+                  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0)
+                  setEndDate(lastDay.toISOString().slice(0, 10))
+                }}
+                className="rounded-full border bg-muted/50 px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                📅 End of current month
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const d = new Date(startDate)
+                  d.setDate(d.getDate() + 29)
+                  setEndDate(d.toISOString().slice(0, 10))
+                }}
+                className="rounded-full border bg-muted/50 px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                ⏱️ 30 days
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const now = new Date()
+                  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+                  const nextMonthEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0)
+                  setStartDate(nextMonthStart.toISOString().slice(0, 10))
+                  setEndDate(nextMonthEnd.toISOString().slice(0, 10))
+                }}
+                className="rounded-full border bg-muted/50 px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                🗓️ Next full month
+              </button>
             </div>
           </div>
 
@@ -238,15 +279,15 @@ const StartCycleDialog = ({ open, onOpenChange, initialValues, onStart }: Props)
               <Label htmlFor="cycle-sweep">Sweep into Want Fund</Label>
               <span className="text-xs font-semibold text-muted-foreground">{sweepPct}%</span>
             </div>
-            <Input
+            <input
               id="cycle-sweep"
               type="range"
               min={0}
               max={100}
-              step={10}
+              step={5}
               value={sweepPct}
               onChange={(e) => setSweepPct(e.target.value)}
-              className="cursor-pointer"
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-muted accent-primary"
             />
           </div>
 

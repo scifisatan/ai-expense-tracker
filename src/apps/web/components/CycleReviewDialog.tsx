@@ -55,7 +55,7 @@ const CycleReviewDialog = ({ open, onOpenChange, onStartNextCycle }: Props) => {
         <DialogHeader>
           <div className="flex items-center gap-2 text-primary">
             <Compass className="size-5" />
-            <span className="text-xs font-semibold uppercase tracking-wider">Cycle Summary</span>
+            <span className="text-xs font-semibold">Cycle summary</span>
           </div>
           <DialogTitle className="text-xl font-bold">Pacing Review</DialogTitle>
           <DialogDescription>

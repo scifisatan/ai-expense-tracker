@@ -194,14 +194,18 @@ export const cyclesRouter = t.router({
     if (!cycle) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Cycle not found" })
     }
-
+    const account = await ctx.repos.accounts.findById(ctx.accountId)
+    const timezone = account?.timezone ?? "UTC"
     const currency = cycle.currency
-    const patch: { grossMinor?: number; sweepPct?: number } = {}
+    const patch: { grossMinor?: number; sweepPct?: number; endAt?: number } = {}
     if (input.gross !== undefined) {
       patch.grossMinor = toMinor(input.gross, currency)
     }
     if (input.sweepPct !== undefined) {
       patch.sweepPct = input.sweepPct
+    }
+    if (input.endDate !== undefined) {
+      patch.endAt = startOfLocalDay(timezone, addDays(timezone, input.endDate, 1))
     }
 
     if (Object.keys(patch).length > 0) {

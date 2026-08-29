@@ -99,6 +99,7 @@ export const cycleCloseInputSchema = z.object({
 export const cycleUpdateInputSchema = z.object({
   id: z.number(),
   gross: z.number().positive().optional(),
+  endDate: z.string().optional(),
   sweepPct: z.number().min(0).max(100).optional(),
   allocations: z.array(cycleAllocationSchema).optional()
 })

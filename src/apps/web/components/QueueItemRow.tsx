@@ -1,4 +1,5 @@
-import { GripVertical, ChevronDown, ChevronUp, ShoppingBag, X, Clock, CheckCircle2 } from "lucide-react"
+import { GripVertical, ChevronDown, ChevronUp, ShoppingBag, X, Clock, CheckCircle2, Check } from "lucide-react"
+import { toast } from "sonner"
 import { Reorder, useDragControls } from "framer-motion"
 import type { QueueItem } from "@web/types"
 import { formatMoney } from "@web/helper"
@@ -7,6 +8,7 @@ import { cn } from "@web/lib/utils"
 
 type Props = {
   item: QueueItem
+  index: number
   currency: string
   canMoveUp: boolean
   canMoveDown: boolean
@@ -37,12 +39,13 @@ const affordabilityLabel = (item: QueueItem): { text: string; isReady: boolean; 
   }
 }
 
-const parseTitleAndTag = (rawTitle: string): { tag: "Urgent" | "Essential" | "Gift" | null; cleanTitle: string } => {
-  const match = rawTitle.match(/^\[(Urgent|Essential|Gift)\]\s*(.*)$/i)
+const parseTitleAndTag = (rawTitle: string): { tag: string | null; cleanTitle: string } => {
+  const match = rawTitle.match(/^\[([^\]]+)\]\s*(.*)$/)
   if (match && match[1]) {
-    const matchedTag = (match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase()) as "Urgent" | "Essential" | "Gift"
+    const rawTag = match[1].trim()
+    const formatted = rawTag.charAt(0).toUpperCase() + rawTag.slice(1)
     return {
-      tag: matchedTag,
+      tag: formatted,
       cleanTitle: match[2] || rawTitle
     }
   }
@@ -51,6 +54,7 @@ const parseTitleAndTag = (rawTitle: string): { tag: "Urgent" | "Essential" | "Gi
 
 const QueueItemRow = ({
   item,
+  index,
   currency,
   canMoveUp,
   canMoveDown,
@@ -66,6 +70,12 @@ const QueueItemRow = ({
   const confirmPurchase = () => {
     if (confirm(`Mark "${cleanTitle}" as purchased?`)) onPurchase()
   }
+  const confirmReceived = () => {
+    if (confirm(`Mark "${cleanTitle}" as received (e.g. gifted / acquired) without spending your wishlist fund?`)) {
+      onRemove()
+      toast.success(`🎉 Marked "${cleanTitle}" as received!`)
+    }
+  }
   const confirmRemove = () => {
     if (confirm(`Remove "${cleanTitle}" from the queue?`)) onRemove()
   }
@@ -77,15 +87,28 @@ const QueueItemRow = ({
       dragListener={false}
       dragControls={dragControls}
       className={cn(
-        "group relative flex select-none items-center gap-2.5 rounded-2xl border border-transparent bg-card/60 px-2.5 py-2.5 shadow-sm transition-all hover:border-border/60 hover:bg-muted/50",
+        "group relative flex select-none items-center gap-2.5 rounded-2xl border border-transparent bg-card/60 px-3 py-2.5 shadow-sm transition-all hover:border-border/60 hover:bg-muted/50",
         status.isReady && "border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/15"
       )}
     >
+      {/* Priority Rank Badge (#1, #2, etc.) */}
+      <span
+        className={cn(
+          "flex size-6 shrink-0 items-center justify-center rounded-lg text-xs font-extrabold",
+          index === 0
+            ? "bg-purple-500/20 text-purple-600 dark:text-purple-400"
+            : "bg-muted text-muted-foreground"
+        )}
+        title={`Priority #${index + 1}`}
+      >
+        #{index + 1}
+      </span>
+
       {/* Drag handle */}
       <div
         onPointerDown={(e) => dragControls.start(e)}
-        className="flex shrink-0 cursor-grab touch-none items-center justify-center p-1 text-muted-foreground/50 transition-colors hover:text-foreground active:cursor-grabbing"
-        title="Drag to reorder"
+        className="flex shrink-0 cursor-grab touch-none items-center justify-center p-0.5 text-muted-foreground/50 transition-colors hover:text-foreground active:cursor-grabbing"
+        title="Drag to prioritize"
       >
         <GripVertical className="size-4" />
       </div>
@@ -95,20 +118,22 @@ const QueueItemRow = ({
         <Button
           variant="ghost"
           size="icon"
-          className="size-5 text-muted-foreground"
+          className="size-4 text-muted-foreground hover:text-foreground"
           disabled={!canMoveUp}
           onClick={onMoveUp}
-          aria-label="Move up"
+          title="Move priority up"
+          aria-label="Move priority up"
         >
           <ChevronUp className="size-3" />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          className="size-5 text-muted-foreground"
+          className="size-4 text-muted-foreground hover:text-foreground"
           disabled={!canMoveDown}
           onClick={onMoveDown}
-          aria-label="Move down"
+          title="Move priority down"
+          aria-label="Move priority down"
         >
           <ChevronDown className="size-3" />
         </Button>
@@ -120,10 +145,11 @@ const QueueItemRow = ({
           {tag && (
             <span
               className={cn(
-                "rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-                tag === "Urgent" && "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30",
-                tag === "Essential" && "bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30",
-                tag === "Gift" && "bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30"
+                "rounded-md px-1.5 py-0.5 text-[11px] font-semibold",
+                tag.toLowerCase() === "urgent" && "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30",
+                tag.toLowerCase() === "essential" && "bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30",
+                tag.toLowerCase() === "gift" && "bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30",
+                !["urgent", "essential", "gift"].includes(tag.toLowerCase()) && "bg-muted text-foreground border border-border"
               )}
             >
               {tag}
@@ -133,62 +159,63 @@ const QueueItemRow = ({
         </div>
 
         <div className="mt-0.5 flex items-center gap-1.5">
-          {status.isCoolingOff && (
-            <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
-              <Clock className="size-2.5" />
+          {status.isCoolingOff ? (
+            <span className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+              <Clock className="size-3" />
               {status.text}
             </span>
-          )}
-          {status.isReady && (
-            <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-              <CheckCircle2 className="size-2.5" />
-              {status.text}
+          ) : status.isReady ? (
+            <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="size-3" />
+              Affordable now
             </span>
-          )}
-          {!status.isCoolingOff && !status.isReady && (
-            <span className="text-[11px] font-medium text-muted-foreground">{status.text}</span>
+          ) : (
+            <span className="text-[11px] text-muted-foreground">{status.text}</span>
           )}
         </div>
       </div>
 
       {/* Price */}
-      <span className="tabular shrink-0 text-sm font-bold text-foreground">
-        {formatMoney(item.priceMinor, currency)}
-      </span>
+      <div className="shrink-0 text-right">
+        <p className="tabular text-sm font-bold text-foreground">
+          {formatMoney(item.priceMinor, currency)}
+        </p>
+      </div>
 
-      {/* Actions */}
+      {/* Purchase / Remove Actions */}
       <div className="flex shrink-0 items-center gap-1">
-        {status.isReady ? (
+        {status.isReady && (
           <Button
-            variant="default"
             size="sm"
-            className="h-7 bg-emerald-600 px-2 text-xs font-semibold text-white hover:bg-emerald-700 dark:bg-emerald-600"
             onClick={confirmPurchase}
-            title="Ready to buy with saved funds"
-          >
-            <ShoppingBag className="mr-1 size-3.5" /> Buy
-          </Button>
-        ) : (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-            onClick={confirmPurchase}
-            disabled={status.isCoolingOff}
-            title={status.isCoolingOff ? "Cooling off" : "Mark purchased"}
+            className="h-8 gap-1 rounded-xl bg-emerald-600 px-3 text-xs font-bold text-white hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400"
           >
             <ShoppingBag className="size-3.5" />
+            Buy
           </Button>
         )}
-
+        {/* Check off as Received (Gifted / Free) */}
         <Button
           variant="ghost"
           size="icon"
-          className="size-7 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
-          onClick={confirmRemove}
-          title="Remove from queue"
+          onClick={confirmReceived}
+          className="size-8 rounded-xl text-muted-foreground/70 transition-colors hover:bg-emerald-500/15 hover:text-emerald-600 dark:hover:text-emerald-400"
+          title="Mark as received (gifted / free)"
+          aria-label="Mark as received"
         >
-          <X className="size-3.5" />
+          <Check className="size-4" />
+        </Button>
+
+        {/* Remove Button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={confirmRemove}
+          className="size-8 rounded-xl text-muted-foreground/60 transition-colors hover:text-destructive"
+          title="Remove from wishlist"
+          aria-label="Remove item"
+        >
+          <X className="size-4" />
         </Button>
       </div>
     </Reorder.Item>

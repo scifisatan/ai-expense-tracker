@@ -9,8 +9,7 @@ import {
   Wallet,
   Menu,
   X,
-  ChevronRight,
-  PlusCircle
+  ChevronRight
 } from "lucide-react"
 import { useTransaction } from "../hooks/useTransaction"
 import BalanceHero from "./BalanceHero"
@@ -20,7 +19,6 @@ import ActivityFeed from "./ActivityFeed"
 import ActivityItem from "./ActivityItem"
 import SettingsPanel from "./SettingsPanel"
 import ThemeToggle from "./ThemeToggle"
-import TransactionDialog from "./TransactionDialog"
 import { QueueView } from "./QueueView"
 import { Button } from "@web/components/ui/button"
 import { cn } from "@web/lib/utils"
@@ -50,7 +48,6 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
 
   const [currentView, setCurrentView] = useState<View>("dashboard")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [addIncomeOpen, setAddIncomeOpen] = useState(false)
   const currency = summary?.currency ?? "USD"
 
   // Surface the hook's status as a toast.
@@ -236,49 +233,28 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
           <div className="w-full">
             {/* VIEW 1: Main Dashboard Command Center */}
             {currentView === "dashboard" && (
-              <div className="space-y-5">
+              <div className="space-y-6">
+                {/* Top Metrics Overview Bar */}
+                <TodayCard onNavigate={setCurrentView} />
+
                 {/* 2-Column Grid on Desktop */}
-                <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-                  {/* Left Main Column: Pacer + Quick Entry */}
-                  <div className="space-y-5 lg:col-span-7 xl:col-span-7">
-                    <TodayCard />
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          Quick Entry
-                        </h3>
-                        <button
-                          type="button"
-                          onClick={() => setAddIncomeOpen(true)}
-                          className="flex items-center gap-1 text-xs font-semibold text-primary transition-colors hover:underline"
-                        >
-                          <PlusCircle className="size-3.5" /> + Add Income / Paycheck
-                        </button>
-                      </div>
-                      <CommandBar
-                        categories={categories}
-                        currency={currency}
-                        onCreate={createTransaction}
-                        onAddFromText={addFromText}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Right Column: Net Balance & Macro Snapshot */}
-                  <div className="space-y-5 lg:col-span-5">
-                    <BalanceHero
-                      balanceMinor={summary?.balance ?? 0}
-                      todayDeltaMinor={todayDeltaMinor}
-                      incomeMinor={summary?.income ?? 0}
-                      expenseMinor={summary?.expense ?? 0}
+                <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+                  {/* Left Column: Quick Entry Command Center & Recent Activity */}
+                  <div className="space-y-6 lg:col-span-7">
+                    <CommandBar
+                      categories={categories}
                       currency={currency}
+                      onCreate={createTransaction}
+                      onAddFromText={addFromText}
                     />
 
-                    {/* Recent Activity Snapshot */}
-                    <div className="rounded-3xl border bg-card p-4 shadow-sm sm:p-5">
+                    {/* Recent Activity Feed */}
+                    <div className="rounded-3xl border bg-card p-5 shadow-sm sm:p-6">
                       <div className="flex items-center justify-between pb-3">
-                        <h3 className="text-sm font-bold text-foreground">Recent Activity</h3>
+                        <div>
+                          <h3 className="text-sm font-bold text-foreground">Recent activity</h3>
+                          <p className="text-xs text-muted-foreground">Your latest recorded transactions</p>
+                        </div>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -308,6 +284,17 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
                         </div>
                       )}
                     </div>
+                  </div>
+
+                  {/* Right Column: Net Balance & Macro Snapshot */}
+                  <div className="space-y-6 lg:col-span-5">
+                    <BalanceHero
+                      balanceMinor={summary?.balance ?? 0}
+                      todayDeltaMinor={todayDeltaMinor}
+                      incomeMinor={summary?.income ?? 0}
+                      expenseMinor={summary?.expense ?? 0}
+                      currency={currency}
+                    />
                   </div>
                 </div>
               </div>
@@ -356,16 +343,6 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
           </div>
         </main>
       </div>
-
-      {/* Quick Add Income / Salary Dialog */}
-      <TransactionDialog
-        open={addIncomeOpen}
-        onOpenChange={setAddIncomeOpen}
-        categories={categories}
-        currency={currency}
-        mode="create"
-        onCreate={createTransaction}
-      />
     </div>
   )
 }

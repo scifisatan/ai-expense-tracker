@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Plus, Gift } from "lucide-react"
+import { Plus, Gift, Check, X } from "lucide-react"
 import { Reorder } from "framer-motion"
 import { useQueue } from "@web/hooks/useQueue"
 import type { QueueItem } from "@web/types"
@@ -13,10 +13,15 @@ type Props = {
   currency: string
 }
 
+const DEFAULT_TAGS = ["Gift", "Essential", "Urgent"]
+
 export const QueueView = ({ currency }: Props) => {
   const [title, setTitle] = useState("")
   const [price, setPrice] = useState("")
-  const [selectedTag, setSelectedTag] = useState<"Gift" | "Essential" | "Urgent">("Gift")
+  const [availableTags, setAvailableTags] = useState<string[]>(DEFAULT_TAGS)
+  const [selectedTag, setSelectedTag] = useState<string>("Gift")
+  const [isAddingTag, setIsAddingTag] = useState(false)
+  const [newTagInput, setNewTagInput] = useState("")
 
   const {
     items: serverItems,
@@ -33,16 +38,41 @@ export const QueueView = ({ currency }: Props) => {
 
   useEffect(() => {
     setLocalItems(serverItems)
+
+    // Extract any existing tags from loaded items
+    const customFound = new Set<string>(DEFAULT_TAGS)
+    serverItems.forEach((it) => {
+      const match = it.title.match(/^\[([^\]]+)\]/)
+      if (match && match[1]) {
+        const t = match[1].trim()
+        const formatted = t.charAt(0).toUpperCase() + t.slice(1)
+        customFound.add(formatted)
+      }
+    })
+    setAvailableTags(Array.from(customFound))
   }, [serverItems])
 
   const priceValue = Number(price)
   const canAdd = Boolean(title.trim()) && Number.isFinite(priceValue) && priceValue > 0
 
+  const handleCreateNewTag = (e: React.FormEvent) => {
+    e.preventDefault()
+    const trimmed = newTagInput.trim()
+    if (!trimmed) return
+    const formatted = trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
+    if (!availableTags.includes(formatted)) {
+      setAvailableTags((prev) => [...prev, formatted])
+    }
+    setSelectedTag(formatted)
+    setNewTagInput("")
+    setIsAddingTag(false)
+  }
+
   const submitNewItem = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!canAdd) return
     const fullTitle = `[${selectedTag}] ${title.trim()}`
-    const coolingDays = selectedTag === "Urgent" ? 0 : selectedTag === "Essential" ? 1 : 3
+    const coolingDays = selectedTag.toLowerCase() === "urgent" ? 0 : selectedTag.toLowerCase() === "essential" ? 1 : 3
     const ok = await addItem({ title: fullTitle, price: priceValue, coolingDays })
     if (ok) {
       setTitle("")
@@ -96,8 +126,8 @@ export const QueueView = ({ currency }: Props) => {
             <Gift className="size-5" />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Want Fund (Wishlist Vault)
+            <p className="text-xs font-medium text-muted-foreground">
+              Wishlist fund balance
             </p>
             <p className="tabular text-xl font-extrabold text-foreground">
               {formatMoney(currentBalanceMinor, currency)}
@@ -107,7 +137,7 @@ export const QueueView = ({ currency }: Props) => {
 
         {projectedDailySweepMinor > 0 && (
           <div className="text-right">
-            <p className="text-xs text-muted-foreground">Daily Accumulation</p>
+            <p className="text-xs text-muted-foreground">Daily pace surplus</p>
             <p className="tabular text-sm font-bold text-emerald-600 dark:text-emerald-400">
               +{formatMoney(projectedDailySweepMinor, currency)}/day
             </p>
@@ -116,10 +146,10 @@ export const QueueView = ({ currency }: Props) => {
       </div>
 
       {/* Priority Wishlist Card */}
-      <div className="space-y-4 rounded-3xl border bg-card p-4 shadow-sm sm:p-5">
+      <div className="space-y-4 rounded-3xl border bg-card p-4 shadow-sm sm:p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-bold text-foreground">Priority Wishlist Queue</h3>
+            <h3 className="text-sm font-bold text-foreground">Priority wishlist items</h3>
             <p className="text-xs text-muted-foreground">
               Ranked items funded automatically by daily underspend sweeps. Drag or use arrows to prioritize.
             </p>
@@ -131,23 +161,25 @@ export const QueueView = ({ currency }: Props) => {
         </div>
 
         {/* Tag Selector & Add Form */}
-        <form onSubmit={submitNewItem} className="space-y-2.5">
-          <div className="flex items-center gap-1.5 text-xs">
+        <form onSubmit={submitNewItem} className="space-y-3">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
             <span className="text-xs font-semibold text-muted-foreground">Tag:</span>
-            {(["Gift", "Essential", "Urgent"] as const).map((tag) => {
+            {availableTags.map((tag) => {
               const isSelected = selectedTag === tag
               return (
                 <button
                   key={tag}
                   type="button"
                   onClick={() => setSelectedTag(tag)}
-                  className={`rounded-full border px-2.5 py-0.5 text-xs font-bold transition-all ${
+                  className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-all ${
                     isSelected
-                      ? tag === "Urgent"
+                      ? tag.toLowerCase() === "urgent"
                         ? "border-rose-500 bg-rose-500 text-white"
-                        : tag === "Essential"
+                        : tag.toLowerCase() === "essential"
                           ? "border-blue-500 bg-blue-500 text-white"
-                          : "border-purple-500 bg-purple-500 text-white"
+                          : tag.toLowerCase() === "gift"
+                            ? "border-purple-500 bg-purple-500 text-white"
+                            : "border-primary bg-primary text-primary-foreground"
                       : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
@@ -155,17 +187,56 @@ export const QueueView = ({ currency }: Props) => {
                 </button>
               )
             })}
+
+            {/* Inline Add Custom Tag */}
+            {isAddingTag ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  placeholder="New tag"
+                  value={newTagInput}
+                  onChange={(e) => setNewTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      handleCreateNewTag(e)
+                    }
+                  }}
+                  className="h-6 w-24 rounded-full border bg-background px-2 text-xs font-medium text-foreground focus:border-primary focus:outline-none"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={handleCreateNewTag}
+                  className="rounded-full bg-primary p-1 text-primary-foreground hover:opacity-90"
+                >
+                  <Check className="size-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAddingTag(false)
+                    setNewTagInput("")
+                  }}
+                  className="rounded-full bg-muted p-1 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="size-3" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsAddingTag(true)}
+                className="flex items-center gap-1 rounded-full border border-dashed px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+              >
+                <Plus className="size-3" /> Add tag
+              </button>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
             <Input
-              placeholder={
-                selectedTag === "Gift"
-                  ? "e.g. Mechanical Keyboard, Sneakers, Game"
-                  : selectedTag === "Essential"
-                    ? "e.g. Winter Jacket, Laptop Repair, Glasses"
-                    : "e.g. Urgent Medicine, Bike Service"
-              }
+              placeholder="e.g. Mechanical Keyboard, Winter Jacket, Vacation"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="flex-1 text-sm"
@@ -178,7 +249,7 @@ export const QueueView = ({ currency }: Props) => {
               onChange={(e) => setPrice(e.target.value)}
             />
             <Button type="submit" disabled={!canAdd} className="gap-1 text-xs font-semibold">
-              <Plus className="size-4" /> Add Item
+              <Plus className="size-4" /> Add item
             </Button>
           </div>
         </form>
@@ -199,6 +270,7 @@ export const QueueView = ({ currency }: Props) => {
               <QueueItemRow
                 key={item.id}
                 item={item}
+                index={index}
                 currency={currency}
                 canMoveUp={index > 0}
                 canMoveDown={index < localItems.length - 1}

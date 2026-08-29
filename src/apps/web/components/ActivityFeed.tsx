@@ -116,7 +116,7 @@ const ActivityFeed = ({ transactions, categories, currency, isLoading, onUpdate,
         <div className="space-y-5 px-1 pb-1">
           {groups.map((group) => (
             <div key={group.label}>
-              <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <p className="px-2 pb-1 text-xs font-semibold text-muted-foreground">
                 {group.label}
               </p>
               <div className="space-y-0.5">

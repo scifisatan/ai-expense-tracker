@@ -118,7 +118,7 @@ export const DepositSavingsDialog = ({ open, onOpenChange, currency, onDeposit }
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="gap-3 sm:gap-3 pt-2">
             <Button
               type="button"
               variant="outline"

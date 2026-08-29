@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Plus, Trash2, Home, Heart, PiggyBank, Tv, Zap, MoreHorizontal } from "lucide-react"
+import { Plus, Trash2, Home, Heart, PiggyBank, Tv, Zap, MoreHorizontal, Gift } from "lucide-react"
 import type { AllocationKind } from "@/shared/types"
 import {
   Dialog,
@@ -30,6 +30,7 @@ export type AllocationPreset = {
 const PRESET_ALLOCATIONS: AllocationPreset[] = [
   { id: "rent", kind: "fixed", label: "Rent / Housing", icon: Home },
   { id: "savings", kind: "savings", label: "Savings Vault", icon: PiggyBank },
+  { id: "want_fund", kind: "other", label: "Wishlist / Want Budget", icon: Gift },
   { id: "utilities", kind: "fixed", label: "Utilities & Bills", icon: Zap },
   { id: "subscriptions", kind: "subscriptions", label: "Subscriptions", icon: Tv },
   { id: "family", kind: "family", label: "Family Support", icon: Heart },
@@ -50,11 +51,13 @@ type Props = {
   cycleId: number
   currency: string
   initialGross: number
+  initialEndDate?: string
   initialSweepPct: number
   initialAllocations: { kind: AllocationKind; label: string; amountMinor: number }[]
   onSave: (input: {
     id: number
     gross?: number
+    endDate?: string
     sweepPct?: number
     allocations: { kind: AllocationKind; label: string; amount: number }[]
   }) => Promise<boolean>
@@ -74,11 +77,13 @@ export const EditAllocationsDialog = ({
   cycleId,
   currency,
   initialGross,
+  initialEndDate,
   initialSweepPct,
   initialAllocations,
   onSave
 }: Props) => {
   const [gross, setGross] = useState("")
+  const [endDate, setEndDate] = useState("")
   const [sweepPct, setSweepPct] = useState("50")
   const [allocations, setAllocations] = useState<AllocationDraft[]>([])
   const [saving, setSaving] = useState(false)
@@ -86,6 +91,7 @@ export const EditAllocationsDialog = ({
   useEffect(() => {
     if (!open) return
     setGross(initialGross ? String(initialGross) : "")
+    setEndDate(initialEndDate ?? "")
     setSweepPct(String(initialSweepPct ?? 50))
     if (initialAllocations && initialAllocations.length > 0) {
       setAllocations(
@@ -105,7 +111,7 @@ export const EditAllocationsDialog = ({
     } else {
       setAllocations([])
     }
-  }, [open, initialGross, initialSweepPct, initialAllocations])
+  }, [open, initialGross, initialEndDate, initialSweepPct, initialAllocations])
 
   const grossValue = Number(gross)
   const grossValid = Boolean(gross) && Number.isFinite(grossValue) && grossValue > 0
@@ -156,6 +162,7 @@ export const EditAllocationsDialog = ({
     const ok = await onSave({
       id: cycleId,
       gross: grossValue,
+      endDate: endDate || undefined,
       sweepPct: Number(sweepPct) || 0,
       allocations: allocations
         .filter((a) => a.label.trim() && Number(a.amount) > 0)
@@ -171,27 +178,65 @@ export const EditAllocationsDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-xl md:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Cycle Allocations</DialogTitle>
           <DialogDescription>
-            Update your income and off-the-top allocations (Needs Reserve, Rent, Savings).
+            Update your income, cycle duration, and off-the-top allocations.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={submit} className="grid gap-4">
-          <div className="grid gap-1.5">
-            <Label htmlFor="edit-gross">Monthly Income / Salary ({currency})</Label>
-            <Input
-              id="edit-gross"
-              type="number"
-              inputMode="decimal"
-              step="any"
-              placeholder="e.g. 60000"
-              value={gross}
-              onChange={(e) => setGross(e.target.value)}
-              required
-            />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="edit-gross">Monthly Income ({currency})</Label>
+              <Input
+                id="edit-gross"
+                type="number"
+                inputMode="decimal"
+                step="any"
+                placeholder="e.g. 60000"
+                value={gross}
+                onChange={(e) => setGross(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-end-date">Cycle End Date</Label>
+              <Input
+                id="edit-end-date"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Quick End Date Presets */}
+          <div className="flex flex-wrap gap-1.5 -mt-2">
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date()
+                const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+                setEndDate(lastDay.toISOString().slice(0, 10))
+              }}
+              className="rounded-full border bg-muted/50 px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              📅 End of current month
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const now = new Date()
+                now.setDate(now.getDate() + 29)
+                setEndDate(now.toISOString().slice(0, 10))
+              }}
+              className="rounded-full border bg-muted/50 px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              ⏱️ 30 days from now
+            </button>
           </div>
 
           <div className="space-y-2">
@@ -203,70 +248,62 @@ export const EditAllocationsDialog = ({
               </Button>
             </div>
 
-            {allocations.length === 0 ? (
-              <p className="rounded-lg border border-dashed p-3 text-center text-xs text-muted-foreground">
-                No allocations set yet. Click &quot;Add Allocation&quot; to protect Rent, Needs Reserve, or Savings.
-              </p>
-            ) : (
-              <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
-                {allocations.map((a, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <Select value={a.presetId} onValueChange={(val) => handlePresetChange(i, val)}>
-                      <SelectTrigger className="w-[140px] text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PRESET_ALLOCATIONS.map((preset) => (
-                          <SelectItem key={preset.id} value={preset.id} className="text-xs">
-                            {preset.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+            <div className="space-y-2">
+              {allocations.map((a, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Select value={a.presetId} onValueChange={(val) => handlePresetChange(i, val)}>
+                    <SelectTrigger className="w-48 text-xs font-medium">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRESET_ALLOCATIONS.map((preset) => (
+                        <SelectItem key={preset.id} value={preset.id} className="text-xs">
+                          {preset.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-                    {a.isCustom ? (
-                      <Input
-                        placeholder="Label"
-                        value={a.label}
-                        onChange={(e) => updateCustomLabel(i, e.target.value)}
-                        className="flex-1 text-xs"
-                      />
-                    ) : (
-                      <div className="flex-1 truncate px-2 text-xs font-medium text-muted-foreground">
-                        {a.label}
-                      </div>
-                    )}
-
+                  {a.isCustom ? (
                     <Input
-                      type="number"
-                      inputMode="decimal"
-                      step="any"
-                      placeholder="Amount"
-                      value={a.amount}
-                      onChange={(e) => updateAllocationAmount(i, e.target.value)}
-                      className="w-24 text-xs font-semibold"
+                      placeholder="Label (e.g. Health)"
+                      value={a.label}
+                      onChange={(e) => updateCustomLabel(i, e.target.value)}
+                      className="flex-1 text-xs"
+                      required
                     />
+                  ) : null}
 
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeAllocation(i)}
-                      className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    placeholder="Amount"
+                    value={a.amount}
+                    onChange={(e) => updateAllocationAmount(i, e.target.value)}
+                    className="tabular w-28 text-xs font-semibold"
+                    required
+                  />
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeAllocation(i)}
+                    className="size-8 text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
           </div>
 
           {grossValid && (
-            <div className="flex items-center justify-between rounded-xl border bg-muted/40 p-3 text-xs">
-              <span className="text-muted-foreground">Discretionary Pool:</span>
-              <span className="font-bold text-foreground">
-                {currency} {remainingPool.toLocaleString()}
+            <div className="flex items-center justify-between rounded-2xl bg-muted/40 p-3 text-xs">
+              <span className="text-muted-foreground">Discretionary pool (to pace daily):</span>
+              <span className="tabular font-bold text-foreground">
+                {currency} {remainingPool.toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </span>
             </div>
           )}
@@ -297,3 +334,5 @@ export const EditAllocationsDialog = ({
     </Dialog>
   )
 }
+
+export default EditAllocationsDialog
