@@ -135,8 +135,10 @@ oauthRoutes.get("/google/callback", async (c) => {
 
     return c.redirect("/app")
   } catch (error) {
+    console.error("[OAuth] Google callback error:", error)
     log.trpc.error("oauth.google.callback_error", error)
-    return c.text("Authentication failed.", 500)
+    const detail = error instanceof Error ? error.message : String(error)
+    return c.text(`Authentication failed: ${detail}`, 500)
   }
 })
 
