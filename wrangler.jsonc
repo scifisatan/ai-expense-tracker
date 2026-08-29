@@ -34,5 +34,10 @@
 			"binding": "BOT_INFO",
 			"id": "36173710ccd74edd936b4cb0e9f22e01"
 		}
-	]
+	],
+	"triggers": {
+		// Runs every 15 minutes so every account's local midnight (day-close)
+		// and local 8am (morning push) are each covered within one tick.
+		"crons": ["*/15 * * * *"]
+	}
 }

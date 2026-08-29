@@ -10,13 +10,12 @@ import Database from "better-sqlite3"
 import { drizzle } from "drizzle-orm/better-sqlite3"
 import { eq } from "drizzle-orm"
 import * as schema from "@/db/schema"
-import { budgetAlerts, transactions } from "@/db/schema"
+import { transactions } from "@/db/schema"
 import type { AppDb } from "@/db/client"
 import type { CloudflareBindings } from "@/apps/env"
 import type { ApiContext } from "@api/trpc"
 import { createRepositories } from "@api/repositories"
 import { router } from "@api/router"
-import { monthKey } from "@/shared/datetime"
 
 // ledger.ingestText builds its AI service via createAiService; replace it with a
 // programmable stub so no network is involved.
@@ -65,7 +64,7 @@ type SetupOptions = {
 
 // Fresh DB + account (with the default category set seeded) + tRPC caller.
 // waitUntil promises are collected so tests can `flush()` background side
-// effects (budget alerts, balance publishing) before asserting.
+// effects (balance publishing) before asserting.
 const setup = async (options: SetupOptions = {}) => {
   const db = createTestDb()
   const repos = createRepositories(db)
@@ -160,24 +159,6 @@ describe("transactions.update", () => {
       amount: 25,
     })
     expect(updated.newBalance).toBe(-2500)
-  })
-
-  it("records a budget alert when the update pushes month-to-date spend past a threshold", async () => {
-    const { caller, repos, flush } = await setup()
-
-    const { budget } = await caller.budgets.create({ amount: 100 }) // overall, 10000 minor
-    const created = await caller.transactions.create({ amount: 50, type: "Expense" })
-
-    // 50% of budget: below every threshold, nothing recorded yet.
-    await flush()
-    const period = monthKey("UTC")
-    expect(await repos.budgets.hasAlerted(budget.id, period, 80)).toBe(false)
-
-    // 90% of budget after the update: crosses the 80% threshold.
-    await caller.transactions.update({ id: created.transaction.id, amount: 90 })
-    await flush()
-    expect(await repos.budgets.hasAlerted(budget.id, period, 80)).toBe(true)
-    expect(await repos.budgets.hasAlerted(budget.id, period, 100)).toBe(false)
   })
 })
 
@@ -330,23 +311,5 @@ describe("ledger.ingestText", () => {
     expect(result.insertedIds).toEqual([])
     expect(result.newBalance).toBeNull()
     expect(await transactionRows(db, accountId)).toHaveLength(0)
-  })
-})
-
-describe("budget alert dedup", () => {
-  it("records a threshold alert only once per budget and period", async () => {
-    const { caller, db, flush } = await setup()
-
-    const { budget } = await caller.budgets.create({ amount: 100 })
-
-    // Both writes leave month-to-date spend past 80% (85% then 90%).
-    await caller.transactions.create({ amount: 85, type: "Expense" })
-    await flush()
-    await caller.transactions.create({ amount: 5, type: "Expense" })
-    await flush()
-
-    const alerts = await db.select().from(budgetAlerts).where(eq(budgetAlerts.budgetId, budget.id))
-    expect(alerts).toHaveLength(1)
-    expect(alerts[0]).toMatchObject({ periodKey: monthKey("UTC"), threshold: 80 })
   })
 })

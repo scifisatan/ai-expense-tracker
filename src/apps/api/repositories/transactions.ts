@@ -102,7 +102,7 @@ export const createTransactionsRepo = (db: AppDb) => ({
   },
 
   // Total expense in [from, to) for a single category (null = all categories).
-  // Used for budget threshold checks.
+  // Used for Pacer's daily/cycle spend totals (lib/pacer.ts, cron/pacerTick.ts).
   getCategoryExpenseInRange: async (
     accountId: string,
     categoryId: number | null,

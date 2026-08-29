@@ -4,6 +4,7 @@ import { type Transaction, type TxUpdatePatch } from "@web/types"
 import type { TransactionType } from "@/shared/types"
 
 export function useTransaction(onMutationSuccess?: () => void) {
+  const utils = trpc.useUtils()
   const {
     data: txData,
     isLoading: isTxLoading,
@@ -34,9 +35,17 @@ export function useTransaction(onMutationSuccess?: () => void) {
   }
 
   const loadData = useCallback(async () => {
-    await Promise.all([refetchTx(), refetchSum(), refetchCategories()])
+    // cycles.current derives today's allowance/spend from the same
+    // transactions rows, but lives in a separate query (usePacer) — a plain
+    // transaction mutation never touches it unless we invalidate explicitly.
+    await Promise.all([
+      refetchTx(),
+      refetchSum(),
+      refetchCategories(),
+      utils.cycles.current.invalidate()
+    ])
     onMutationSuccess?.()
-  }, [refetchTx, refetchSum, refetchCategories, onMutationSuccess])
+  }, [refetchTx, refetchSum, refetchCategories, utils, onMutationSuccess])
 
   const createTransaction = async (input: {
     amount: number

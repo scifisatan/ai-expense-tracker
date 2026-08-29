@@ -7,7 +7,6 @@ import {
   transactionsUpdateInputSchema,
 } from "@/shared/types";
 import { publishBalance } from "@api/lib/ledger";
-import { checkBudgetAlerts } from "@api/lib/budgets";
 import { toMinor } from "@/shared/money";
 import { log } from "@/utils/logger";
 import { normalizeBackdate, resolvePeriod } from "@/shared/datetime";
@@ -75,9 +74,6 @@ export const transactionsRouter = t.router({
         publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, currency)
           .catch((error) => log.api.error("publish-balance", error)),
       );
-      ctx.waitUntil(checkBudgetAlerts(ctx, [
-        { type: input.type, categoryId: input.categoryId ?? null, amountMinor: created.amountMinor },
-      ]));
 
       return { ok: true, transaction: created, newBalance };
     }),
@@ -122,7 +118,6 @@ export const transactionsRouter = t.router({
         publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, currency)
           .catch((error) => log.api.error("publish-balance", error)),
       );
-      ctx.waitUntil(checkBudgetAlerts(ctx, [{ type, categoryId, amountMinor }]));
 
       return { ok: true, newBalance };
     }),

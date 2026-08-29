@@ -14,17 +14,20 @@ export { formatMoney }
 export const BUTTON = {
   balance: "💰 Balance",
   transactions: "📒 Transactions",
+  today: "🎯 Today",
   help: "ℹ️ Help",
 } as const
 
 export const BUTTON_BALANCE_RE = /^💰\s*Balance$/i
 export const BUTTON_TRANSACTIONS_RE = /^📒\s*Transactions$/i
+export const BUTTON_TODAY_RE = /^🎯\s*Today$/i
 export const BUTTON_HELP_RE = /^ℹ️\s*Help$/i
 
 // True when free text is really a tap on one of the persistent keyboard buttons.
 export const isKeyboardButton = (text: string): boolean =>
   BUTTON_BALANCE_RE.test(text) ||
   BUTTON_TRANSACTIONS_RE.test(text) ||
+  BUTTON_TODAY_RE.test(text) ||
   BUTTON_HELP_RE.test(text)
 
 // Escape characters that would break legacy "Markdown" parsing when we
@@ -55,7 +58,7 @@ export const getUndoKeyboard = (ids: number[]): InlineKeyboard | undefined => {
 export const getChatKeyboard = () => ({
   keyboard: [
     [{ text: BUTTON.balance }, { text: BUTTON.transactions }],
-    [{ text: BUTTON.help }],
+    [{ text: BUTTON.today }, { text: BUTTON.help }],
     [{ text: "/start" }],
   ],
   resize_keyboard: true,
@@ -226,7 +229,107 @@ export const msg = {
       "`/balance` — Show your current balance",
       "`/transactions` — See recent activity",
       "`/month` — This month's income, spending & net",
+      "`/today` — Today's pacing number",
+      "`/want 8500 headphones` — Queue a want",
+      "`/need 3000 shoes` — Queue a need",
+      "`/queue` — See what's queued",
+      "`/undo` — Remove your most recent entry",
     ].join("\n"),
+
+  // /today when a pacing cycle is running.
+  today: (snapshot: {
+    currency: string
+    allowanceMinor: number
+    remainingTodayMinor: number
+    daysRemainingInclusive: number
+    wantFundMinor: number
+    needsReserveMinor: number
+    nearestQueueItem: { title: string; daysToAfford: number | null } | null
+  }): string => {
+    const overspent = snapshot.remainingTodayMinor < 0
+    const lines = [
+      `🎯 Today's number: *${formatMoney(snapshot.allowanceMinor, snapshot.currency)}*`,
+      overspent
+        ? `${formatMoney(Math.abs(snapshot.remainingTodayMinor), snapshot.currency)} over today's allowance`
+        : `${formatMoney(snapshot.remainingTodayMinor, snapshot.currency)} left today`,
+      "",
+      `Want Fund: ${formatMoney(snapshot.wantFundMinor, snapshot.currency)}`,
+      `Needs reserve: ${formatMoney(snapshot.needsReserveMinor, snapshot.currency)}`,
+      `${snapshot.daysRemainingInclusive} day${snapshot.daysRemainingInclusive === 1 ? "" : "s"} left in this cycle`,
+    ]
+    if (snapshot.nearestQueueItem) {
+      const { title, daysToAfford } = snapshot.nearestQueueItem
+      const projection =
+        daysToAfford === null
+          ? "not affordable at the current pace yet"
+          : daysToAfford === 0
+            ? "affordable now"
+            : `about ${daysToAfford} day${daysToAfford === 1 ? "" : "s"} away`
+      lines.push("", `Next up: ${escapeMd(title)} — ${projection}`)
+    }
+    return lines.join("\n")
+  },
+
+  // /today with no pacing cycle running.
+  noCycle: (): string =>
+    [
+      "🌱 No pacing cycle running yet.",
+      "",
+      "Start one from your dashboard — set your income and what's already spoken for, and I'll tell you your number every day.",
+    ].join("\n"),
+
+  // Response to /want or /need on success.
+  queueAdded: (item: {
+    title: string
+    priceMinor: number
+    currency: string
+    coolingUntil: string | null
+  }): string =>
+    [
+      `✅ Added to your queue: *${escapeMd(item.title)}* — ${formatMoney(item.priceMinor, item.currency)}`,
+      item.coolingUntil ? `Cooling off until ${item.coolingUntil}.` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+
+  // Shown when /want or /need is missing its price/title.
+  queueUsage: (kind: "want" | "need"): string =>
+    `Try it like this: \`/${kind} ${kind === "want" ? "8500 headphones" : "3000 shoes"}\``,
+
+  // /queue — top items from each track.
+  queueList: (
+    wants: { title: string; priceMinor: number; currency: string; daysToAfford: number | null }[],
+    needs: { title: string; priceMinor: number; currency: string }[]
+  ): string => {
+    if (!wants.length && !needs.length) {
+      return [
+        "📭 Nothing queued yet.",
+        "",
+        "Try `/want 8500 headphones` or `/need 3000 shoes`.",
+      ].join("\n")
+    }
+
+    const lines = ["📋 Your queue:"]
+    if (wants.length) {
+      lines.push("", "*Wants*")
+      wants.slice(0, 5).forEach((item, index) => {
+        const projection =
+          item.daysToAfford === null
+            ? "not affordable yet"
+            : item.daysToAfford === 0
+              ? "affordable now"
+              : `~${item.daysToAfford}d away`
+        lines.push(`${index + 1}. ${escapeMd(item.title)} — ${formatMoney(item.priceMinor, item.currency)} (${projection})`)
+      })
+    }
+    if (needs.length) {
+      lines.push("", "*Needs*")
+      needs.slice(0, 5).forEach((item, index) => {
+        lines.push(`${index + 1}. ${escapeMd(item.title)} — ${formatMoney(item.priceMinor, item.currency)}`)
+      })
+    }
+    return lines.join("\n")
+  },
 
   // Shown when free text parsed fine but contained no recognizable amounts.
   nothingFound: (): string =>

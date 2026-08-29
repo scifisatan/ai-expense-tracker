@@ -1,16 +1,8 @@
 import { useState } from "react"
 import { toast } from "sonner"
-import {
-  AlertTriangle,
-  MessageCircle,
-  Settings as SettingsIcon,
-  Tags,
-  Trash2,
-  Wallet
-} from "lucide-react"
+import { AlertTriangle, MessageCircle, Settings as SettingsIcon, Tags, Trash2 } from "lucide-react"
 import { trpc } from "@web/trpc"
 import type { TransactionType } from "@/shared/types"
-import { formatMoney } from "@/shared/money"
 import {
   Dialog,
   DialogContent,
@@ -32,14 +24,11 @@ import {
 import { cn } from "@web/lib/utils"
 import { CURRENCIES, TIMEZONES } from "@web/lib/locale"
 
-const OVERALL_BUDGET = "overall"
-
 const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
   const utils = trpc.useUtils()
   const settingsQuery = trpc.settings.get.useQuery()
   const linksQuery = trpc.telegram.listLinks.useQuery()
   const categoriesQuery = trpc.categories.list.useQuery()
-  const budgetsQuery = trpc.budgets.list.useQuery()
 
   const setCurrency = trpc.settings.setDefaultCurrency.useMutation()
   const updateSettings = trpc.settings.update.useMutation()
@@ -47,15 +36,11 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
   const unlink = trpc.telegram.unlink.useMutation()
   const createCategory = trpc.categories.create.useMutation()
   const deleteCategory = trpc.categories.delete.useMutation()
-  const createBudget = trpc.budgets.create.useMutation()
-  const deleteBudget = trpc.budgets.remove.useMutation()
   const deleteAccount = trpc.auth.deleteAccount.useMutation()
 
   const [code, setCode] = useState("")
   const [newCatName, setNewCatName] = useState("")
   const [newCatType, setNewCatType] = useState<TransactionType>("Expense")
-  const [newBudgetCategory, setNewBudgetCategory] = useState<string>(OVERALL_BUDGET)
-  const [newBudgetAmount, setNewBudgetAmount] = useState("")
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState("")
 
@@ -128,28 +113,6 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
       toast.success("Category removed")
     }, "Couldn't remove category — try again.")
 
-  const addBudget = async () => {
-    const amount = Number(newBudgetAmount)
-    if (!Number.isFinite(amount) || amount <= 0) return
-    await attempt(async () => {
-      await createBudget.mutateAsync({
-        amount,
-        categoryId: newBudgetCategory === OVERALL_BUDGET ? null : Number(newBudgetCategory)
-      })
-      setNewBudgetAmount("")
-      setNewBudgetCategory(OVERALL_BUDGET)
-      await Promise.all([budgetsQuery.refetch(), utils.budgets.list.invalidate()])
-      toast.success("Budget saved")
-    }, "Couldn't save budget — try again.")
-  }
-
-  const removeBudget = (id: number) =>
-    attempt(async () => {
-      await deleteBudget.mutateAsync({ id })
-      await Promise.all([budgetsQuery.refetch(), utils.budgets.list.invalidate()])
-      toast.success("Budget removed")
-    }, "Couldn't remove budget — try again.")
-
   const confirmDelete = async () => {
     try {
       await deleteAccount.mutateAsync()
@@ -165,10 +128,6 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
   const settings = settingsQuery.data
   const categories = categoriesQuery.data?.items ?? []
   const links = linksQuery.data?.items ?? []
-  const budgets = budgetsQuery.data?.items ?? []
-  const expenseCategories = categories.filter((c) => c.type === "Expense")
-  const categoryName = (id: number | null) =>
-    id === null ? "Overall" : (categories.find((c) => c.id === id)?.name ?? "Category")
 
   return (
     <Dialog
@@ -184,14 +143,10 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
         </DialogHeader>
 
         <Tabs defaultValue="general" className="gap-0 px-6 py-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="general">
               <SettingsIcon />
               <span className="hidden sm:inline">General</span>
-            </TabsTrigger>
-            <TabsTrigger value="budgets">
-              <Wallet />
-              <span className="hidden sm:inline">Budgets</span>
             </TabsTrigger>
             <TabsTrigger value="telegram">
               <MessageCircle />
@@ -257,7 +212,7 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
                   <p className="text-sm font-medium">Delete account</p>
                   <p className="text-xs text-muted-foreground">
                     Permanently deletes your account and everything in it — transactions,
-                    categories, budgets, and Telegram connections. This can't be undone.
+                    categories, and Telegram connections. This can't be undone.
                   </p>
                 </div>
               </div>
@@ -310,80 +265,6 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
                 </div>
               )}
             </div>
-          </TabsContent>
-
-          {/* Budgets */}
-          <TabsContent value="budgets" className="mt-6 flex flex-col gap-2">
-            <Label htmlFor="settings-budget-amount">Monthly budget</Label>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Select value={newBudgetCategory} onValueChange={setNewBudgetCategory}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={OVERALL_BUDGET}>Overall</SelectItem>
-                  {expenseCategories.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="flex gap-2">
-                <Input
-                  id="settings-budget-amount"
-                  type="number"
-                  inputMode="decimal"
-                  placeholder="Amount"
-                  value={newBudgetAmount}
-                  onChange={(e) => setNewBudgetAmount(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") addBudget()
-                  }}
-                  className="flex-1 tabular sm:w-32"
-                />
-                <Button
-                  onClick={addBudget}
-                  disabled={!newBudgetAmount.trim() || createBudget.isPending}
-                >
-                  Save
-                </Button>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Get a Telegram alert at 80% and 100% of each monthly budget.
-            </p>
-
-            {budgets.length > 0 ? (
-              <ul className="mt-2 flex flex-col gap-1">
-                {budgets.map((budget) => (
-                  <li
-                    key={budget.id}
-                    className="flex items-center justify-between gap-2 rounded-md border bg-card px-3 py-2"
-                  >
-                    <span className="flex items-center gap-2 truncate text-sm">
-                      <span className="truncate">{categoryName(budget.categoryId)}</span>
-                      <span className="tabular text-muted-foreground">
-                        {formatMoney(budget.amountMinor, budget.currency)}/mo
-                      </span>
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => removeBudget(budget.id)}
-                      aria-label={`Delete budget`}
-                    >
-                      <Trash2 />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="mt-2 flex flex-col items-center gap-2 rounded-md border border-dashed px-6 py-8 text-center">
-                <Wallet className="size-6 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">No budgets yet</p>
-              </div>
-            )}
           </TabsContent>
 
           {/* Telegram */}

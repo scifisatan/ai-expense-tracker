@@ -3,7 +3,7 @@ import { toast } from "sonner"
 import { LogOut, Settings as SettingsIcon, Wallet } from "lucide-react"
 import { useTransaction } from "../hooks/useTransaction"
 import BalanceHero from "./BalanceHero"
-import BudgetsCard from "./BudgetsCard"
+import TodayCard from "./TodayCard"
 import CommandBar from "./CommandBar"
 import ActivityFeed from "./ActivityFeed"
 import SettingsPanel from "./SettingsPanel"
@@ -99,7 +99,7 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
           currency={currency}
         />
 
-        <BudgetsCard categories={categories} />
+        <TodayCard />
 
         <CommandBar
           categories={categories}

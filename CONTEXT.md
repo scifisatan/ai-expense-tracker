@@ -135,17 +135,15 @@ text → ledger.ingestText (protected, account-scoped)
      → insert transactions (source = "telegram" for bot, "web" for web)
      → recompute net balance
      → background (ctx.waitUntil): publish/pin balance to every linked Telegram
-       chat + check budget alerts — the mutation response never waits on Telegram
+       chat — the mutation response never waits on Telegram
 ```
 
 ### Manual entry (web)
 `transactions.create` takes a decimal amount + type + optional category/note/date, converts
 to minor units using the account's default currency, inserts, and republishes the balance.
-Like all mutations, the Telegram publish + budget-alert check run via `ctx.waitUntil`
-(exposed on the tRPC context), off the request's critical path. `transactions.update`
-also re-checks budget alerts with the post-edit values, so an edit that crosses a
-threshold alerts too. `ledger.refreshBalance` is the exception: publishing *is* its
-purpose, so it stays awaited.
+Like all mutations, the Telegram publish runs via `ctx.waitUntil` (exposed on the tRPC
+context), off the request's critical path. `ledger.refreshBalance` is the exception:
+publishing *is* its purpose, so it stays awaited.
 
 ### Balance publishing — `src/apps/api/lib/ledger.ts`
 `publishBalance` looks up all `telegram_links` for the account and sends + pins a formatted

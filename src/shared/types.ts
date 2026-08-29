@@ -65,20 +65,69 @@ export const categoryDeleteInputSchema = z.object({
   id: z.number()
 })
 
-// Budgets. categoryId null/omitted = overall account budget. Amount is a
-// major-unit decimal, converted to minor units server-side.
-export const budgetCreateInputSchema = z.object({
-  categoryId: z.number().nullable().optional(),
+// Pacer cycles. gross/allocation amounts are major-unit decimals, converted to
+// minor units server-side against the account's (locked) default currency.
+export const allocationKindSchema = z.enum([
+  "family",
+  "savings",
+  "subscriptions",
+  "fixed",
+  "needs_reserve",
+  "other"
+])
+
+export type AllocationKind = z.infer<typeof allocationKindSchema>
+
+export const cycleAllocationSchema = z.object({
+  kind: allocationKindSchema,
+  label: z.string().trim().min(1).max(64),
   amount: z.number().positive()
 })
 
-export const budgetUpdateInputSchema = z.object({
-  id: z.number(),
-  categoryId: z.number().nullable().optional(),
-  amount: z.number().positive().optional()
+export const cycleCreateInputSchema = z.object({
+  startDate: z.string(), // "YYYY-MM-DD", local to the account timezone
+  endDate: z.string(), // inclusive
+  gross: z.number().positive(),
+  sweepPct: z.number().min(0).max(100).default(50),
+  allocations: z.array(cycleAllocationSchema).default([])
 })
 
-export const budgetDeleteInputSchema = z.object({
+export const cycleCloseInputSchema = z.object({
+  id: z.number()
+})
+
+// Needs/wants queue
+export const queueKindSchema = z.enum(["need", "want"])
+
+export const queueListInputSchema = z.object({
+  kind: queueKindSchema
+})
+
+export const queueCreateInputSchema = z.object({
+  kind: queueKindSchema,
+  title: z.string().trim().min(1).max(140),
+  price: z.number().positive(),
+  coolingDays: z.number().min(0).max(90).optional(),
+  deadline: z.string().optional() // needs only, informational
+})
+
+export const queueUpdateInputSchema = z.object({
+  id: z.number(),
+  title: z.string().trim().min(1).max(140).optional(),
+  price: z.number().positive().optional(),
+  deadline: z.string().nullable().optional()
+})
+
+export const queueReorderInputSchema = z.object({
+  id: z.number(),
+  afterId: z.number().nullable() // null = move to the top of the list
+})
+
+export const queuePurchaseInputSchema = z.object({
+  id: z.number()
+})
+
+export const queueRemoveInputSchema = z.object({
   id: z.number()
 })
 

@@ -4,9 +4,13 @@ import { and, eq, inArray, sql } from "drizzle-orm"
 import {
   accountSettings,
   accounts,
-  budgetAlerts,
-  budgets,
+  allocations,
   categories,
+  cycles,
+  dayCloses,
+  fundLedger,
+  morningPushes,
+  queueItems,
   telegramLinks,
   transactions,
 } from "@/db/schema"
@@ -97,14 +101,18 @@ export const createAccountsRepo = (db: AppDb) => ({
   // child-before-parent so the foreign-key references are always satisfied, and
   // are batched so the whole erasure is atomic (all-or-nothing).
   deleteAccount: (id: string) => {
-    const accountBudgetIds = db
-      .select({ id: budgets.id })
-      .from(budgets)
-      .where(eq(budgets.accountId, id))
+    const accountCycleIds = db
+      .select({ id: cycles.id })
+      .from(cycles)
+      .where(eq(cycles.accountId, id))
 
     return db.batch([
-      db.delete(budgetAlerts).where(inArray(budgetAlerts.budgetId, accountBudgetIds)),
-      db.delete(budgets).where(eq(budgets.accountId, id)),
+      db.delete(fundLedger).where(eq(fundLedger.accountId, id)),
+      db.delete(queueItems).where(eq(queueItems.accountId, id)),
+      db.delete(dayCloses).where(eq(dayCloses.accountId, id)),
+      db.delete(morningPushes).where(eq(morningPushes.accountId, id)),
+      db.delete(allocations).where(inArray(allocations.cycleId, accountCycleIds)),
+      db.delete(cycles).where(eq(cycles.accountId, id)),
       db.delete(transactions).where(eq(transactions.accountId, id)),
       db.delete(categories).where(eq(categories.accountId, id)),
       db.delete(telegramLinks).where(eq(telegramLinks.accountId, id)),

@@ -2,7 +2,6 @@ import { z } from "zod";
 import { t, protectedProcedure } from "../trpc";
 import { createAiService } from "@/services/ai";
 import { publishBalance } from "@api/lib/ledger";
-import { checkBudgetAlerts } from "@api/lib/budgets";
 import { consumeAiQuota } from "@api/lib/rate-limit";
 import { toMinor } from "@/shared/money";
 import { localDateString, normalizeBackdate } from "@/shared/datetime";
@@ -101,7 +100,6 @@ export const ledgerRouter = t.router({
         publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, currency)
           .catch((error) => log.api.error("publish-balance", error)),
       );
-      ctx.waitUntil(checkBudgetAlerts(ctx, items));
 
       const net = items.reduce(
         (sum, item) => sum + (item.type === "Income" ? item.amountMinor : -item.amountMinor),

@@ -152,3 +152,37 @@ export const weekRange = (tz: string, now: Date = new Date()): DbRange => {
   const end = zonedWallTimeToUtc(tz, year, month, day - dow + 7)
   return { from: toDbTimestamp(start), to: toDbTimestamp(end) }
 }
+
+// [start, end) DB timestamps for the local calendar day containing `now`.
+// Used to bucket "today"/"yesterday" spend for the day-close cron.
+export const dayRange = (tz: string, now: Date = new Date()): DbRange => {
+  const [year, month, day] = localDateString(tz, now).split("-").map(Number)
+  const from = zonedWallTimeToUtc(tz, year, month, day)
+  const to = zonedWallTimeToUtc(tz, year, month, day + 1)
+  return { from: toDbTimestamp(from), to: toDbTimestamp(to) }
+}
+
+// DB timestamp for local midnight of a "YYYY-MM-DD" date, e.g. to turn a
+// cycle's user-supplied start/end dates into stored range boundaries.
+export const startOfLocalDay = (tz: string, dateStr: string): string => {
+  const [year, month, day] = dateStr.split("-").map(Number)
+  return toDbTimestamp(zonedWallTimeToUtc(tz, year, month, day))
+}
+
+// Add n local days (may be negative) to a "YYYY-MM-DD" string. Anchored at
+// local noon, same DST-safety rationale as normalizeBackdate.
+export const addDays = (tz: string, dateStr: string, n: number): string => {
+  const [year, month, day] = dateStr.split("-").map(Number)
+  return localDateString(tz, zonedWallTimeToUtc(tz, year, month, day + n, 12))
+}
+
+// Whole calendar days between two "YYYY-MM-DD" strings (toDateStrExclusive
+// is not counted), pure date arithmetic with no timezone involved.
+export const daysBetweenLocalDates = (fromDateStr: string, toDateStrExclusive: string): number => {
+  const [fy, fm, fd] = fromDateStr.split("-").map(Number)
+  const [ty, tm, td] = toDateStrExclusive.split("-").map(Number)
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000)
+}
+
+// Parse a DB "YYYY-MM-DD HH:MM:SS" (always UTC) back into a Date.
+export const parseDbTimestamp = (ts: string): Date => new Date(`${ts.replace(" ", "T")}Z`)

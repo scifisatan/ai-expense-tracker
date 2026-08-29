@@ -4,7 +4,12 @@ import {
   monthRange,
   normalizeBackdate,
   resolvePeriod,
-  toDbTimestamp
+  toDbTimestamp,
+  dayRange,
+  startOfLocalDay,
+  addDays,
+  daysBetweenLocalDates,
+  parseDbTimestamp
 } from "./datetime"
 
 describe("datetime", () => {
@@ -54,5 +59,35 @@ describe("datetime", () => {
 
     const fallback = resolvePeriod({ period: "custom" }, "UTC", now)
     expect(fallback.from).toBe("2026-06-01 00:00:00")
+  })
+
+  it("day boundaries are a half-open range in the local timezone", () => {
+    // 2026-06-20 23:30 UTC is already 2026-06-21 00:15 in Kathmandu.
+    const now = new Date("2026-06-20T23:30:00Z")
+    const range = dayRange("Asia/Kathmandu", now)
+    expect(range.from).toBe("2026-06-20 18:15:00")
+    expect(range.to).toBe("2026-06-21 18:15:00")
+  })
+
+  it("gives local midnight for startOfLocalDay", () => {
+    expect(startOfLocalDay("UTC", "2026-06-20")).toBe("2026-06-20 00:00:00")
+    expect(startOfLocalDay("Asia/Kathmandu", "2026-06-20")).toBe("2026-06-19 18:15:00")
+  })
+
+  it("addDays shifts forward and backward across month/DST-agnostic boundaries", () => {
+    expect(addDays("UTC", "2026-06-20", 1)).toBe("2026-06-21")
+    expect(addDays("UTC", "2026-06-20", -20)).toBe("2026-05-31")
+    expect(addDays("Asia/Kathmandu", "2026-06-20", -1)).toBe("2026-06-19")
+  })
+
+  it("daysBetweenLocalDates counts whole calendar days, exclusive of the end", () => {
+    expect(daysBetweenLocalDates("2026-06-01", "2026-06-01")).toBe(0)
+    expect(daysBetweenLocalDates("2026-06-01", "2026-07-01")).toBe(30)
+    expect(daysBetweenLocalDates("2026-06-15", "2026-06-01")).toBe(-14)
+  })
+
+  it("parseDbTimestamp round-trips toDbTimestamp", () => {
+    const original = new Date("2026-06-20T13:45:09.000Z")
+    expect(parseDbTimestamp(toDbTimestamp(original)).getTime()).toBe(original.getTime())
   })
 })

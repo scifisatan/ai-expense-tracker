@@ -9,6 +9,9 @@ type Transaction = RouterOutput["transactions"]["list"]["items"][number]
 type Summary = RouterOutput["insights"]["summary"]
 type Category = RouterOutput["categories"]["list"]["items"][number]
 type TelegramLink = RouterOutput["telegram"]["listLinks"]["items"][number]
+type CycleSnapshot = RouterOutput["cycles"]["current"]
+type QueueItem = RouterOutput["queue"]["list"]["items"][number]
+type QueueKind = "need" | "want"
 
 type TxUpdatePatch = {
   amount?: number
@@ -22,4 +25,16 @@ type TxUpdatePatch = {
 type SortKey = "id" | "amountMinor" | "type" | "occurredAt"
 type SortDir = "asc" | "desc"
 
-export type { SessionResponse, Transaction, Summary, Category, TelegramLink, TxUpdatePatch, SortKey, SortDir }
+export type {
+  SessionResponse,
+  Transaction,
+  Summary,
+  Category,
+  TelegramLink,
+  TxUpdatePatch,
+  SortKey,
+  SortDir,
+  CycleSnapshot,
+  QueueItem,
+  QueueKind
+}
