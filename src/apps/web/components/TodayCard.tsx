@@ -245,7 +245,7 @@ const TodayCard = ({ onNavigate }: Props) => {
   return (
     <div className="space-y-4">
       {/* 3-Box Overview Grid */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {/* Box 1: Today's Safe Spending Pace */}
         <div className="flex flex-col justify-between rounded-3xl border bg-card p-5 shadow-sm sm:p-6 transition-all hover:border-border/80">
           <div>
@@ -270,7 +270,7 @@ const TodayCard = ({ onNavigate }: Props) => {
               </p>
               <p
                 className={cn(
-                  "tabular mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl",
+                  "tabular mt-1 text-2xl font-extrabold tracking-tight truncate sm:text-3xl xl:text-4xl",
                   overspent ? "text-rose-600 dark:text-rose-400" : "text-foreground"
                 )}
               >
@@ -281,11 +281,11 @@ const TodayCard = ({ onNavigate }: Props) => {
 
           <div className="mt-4 space-y-1.5 cursor-pointer" onClick={() => onNavigate?.("pacer")}>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>
+              <span className="truncate">
                 Spent <strong className="tabular text-foreground">{formatMoney(spentTodayMinor, currency)}</strong> of{" "}
                 <span className="tabular">{formatMoney(allowanceMinor, currency)}</span>
               </span>
-              <span className="tabular font-bold">{spendPct}%</span>
+              <span className="tabular font-semibold shrink-0">{spendPct}%</span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
               <div
@@ -298,13 +298,13 @@ const TodayCard = ({ onNavigate }: Props) => {
             </div>
           </div>
 
-          <div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-1 border-t pt-3 text-xs text-muted-foreground">
             <button
               type="button"
               onClick={() => onNavigate?.("pacer")}
               className="hover:text-foreground"
             >
-              Daily discretionary pace →
+              Daily pace →
             </button>
             <button
               type="button"
@@ -340,14 +340,14 @@ const TodayCard = ({ onNavigate }: Props) => {
             <div className="mt-3 cursor-pointer" onClick={() => onNavigate?.("savings")}>
               <p className="text-xs font-medium text-muted-foreground">Total protected savings</p>
               <p
-                className="tabular mt-1 text-3xl font-extrabold tracking-tight text-foreground transition-opacity hover:opacity-80 sm:text-4xl"
+                className="tabular mt-1 text-2xl font-extrabold tracking-tight text-foreground truncate transition-opacity hover:opacity-80 sm:text-3xl xl:text-4xl"
               >
                 {formatMoney(totalAccumulatedSavings, currency)}
               </p>
             </div>
           </div>
 
-          <div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-1 border-t pt-3 text-xs text-muted-foreground">
             <button
               type="button"
               onClick={() => onNavigate?.("savings")}
@@ -366,7 +366,7 @@ const TodayCard = ({ onNavigate }: Props) => {
         </div>
 
         {/* Box 3: Wishlist Want Fund */}
-        <div className="flex flex-col justify-between rounded-3xl border bg-card p-5 shadow-sm sm:p-6 transition-all hover:border-border/80">
+        <div className="flex flex-col justify-between rounded-3xl border bg-card p-5 shadow-sm sm:p-6 transition-all hover:border-border/80 md:col-span-2 xl:col-span-1">
           <div>
             <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
               <button
@@ -389,7 +389,7 @@ const TodayCard = ({ onNavigate }: Props) => {
             <div className="mt-3 cursor-pointer" onClick={handleOpenWishlist}>
               <p className="text-xs font-medium text-muted-foreground">Daily underspend sweeps</p>
               <p
-                className="tabular mt-1 text-3xl font-extrabold tracking-tight text-foreground transition-opacity hover:opacity-80 sm:text-4xl"
+                className="tabular mt-1 text-2xl font-extrabold tracking-tight text-foreground truncate transition-opacity hover:opacity-80 sm:text-3xl xl:text-4xl"
               >
                 {formatMoney(wantFundMinor, currency)}
               </p>
@@ -414,7 +414,7 @@ const TodayCard = ({ onNavigate }: Props) => {
                 </span>
               </div>
             ) : (
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center justify-between gap-1 text-xs text-muted-foreground">
                 <span>Daily sweeps reward wishlist</span>
                 <button
                   type="button"
