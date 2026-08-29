@@ -37,6 +37,18 @@ const affordabilityLabel = (item: QueueItem): { text: string; isReady: boolean; 
   }
 }
 
+const parseTitleAndTag = (rawTitle: string): { tag: "Urgent" | "Essential" | "Gift" | null; cleanTitle: string } => {
+  const match = rawTitle.match(/^\[(Urgent|Essential|Gift)\]\s*(.*)$/i)
+  if (match && match[1]) {
+    const matchedTag = (match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase()) as "Urgent" | "Essential" | "Gift"
+    return {
+      tag: matchedTag,
+      cleanTitle: match[2] || rawTitle
+    }
+  }
+  return { tag: null, cleanTitle: rawTitle }
+}
+
 const QueueItemRow = ({
   item,
   currency,
@@ -49,12 +61,13 @@ const QueueItemRow = ({
 }: Props) => {
   const dragControls = useDragControls()
   const status = affordabilityLabel(item)
+  const { tag, cleanTitle } = parseTitleAndTag(item.title)
 
   const confirmPurchase = () => {
-    if (confirm(`Mark "${item.title}" as purchased?`)) onPurchase()
+    if (confirm(`Mark "${cleanTitle}" as purchased?`)) onPurchase()
   }
   const confirmRemove = () => {
-    if (confirm(`Remove "${item.title}" from the queue?`)) onRemove()
+    if (confirm(`Remove "${cleanTitle}" from the queue?`)) onRemove()
   }
 
   return (
@@ -103,7 +116,22 @@ const QueueItemRow = ({
 
       {/* Title & Affordability Status */}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-foreground">{item.title}</p>
+        <div className="flex items-center gap-2">
+          {tag && (
+            <span
+              className={cn(
+                "rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                tag === "Urgent" && "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30",
+                tag === "Essential" && "bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30",
+                tag === "Gift" && "bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30"
+              )}
+            >
+              {tag}
+            </span>
+          )}
+          <p className="truncate text-sm font-semibold text-foreground">{cleanTitle}</p>
+        </div>
+
         <div className="mt-0.5 flex items-center gap-1.5">
           {status.isCoolingOff && (
             <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
@@ -118,7 +146,7 @@ const QueueItemRow = ({
             </span>
           )}
           {!status.isCoolingOff && !status.isReady && (
-            <span className="text-xs text-muted-foreground">{status.text}</span>
+            <span className="text-[11px] font-medium text-muted-foreground">{status.text}</span>
           )}
         </div>
       </div>

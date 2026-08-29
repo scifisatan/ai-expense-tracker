@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react"
-import { Plus, Sparkles, ShieldCheck } from "lucide-react"
+import { Plus, Gift } from "lucide-react"
 import { Reorder } from "framer-motion"
 import { useQueue } from "@web/hooks/useQueue"
-import type { QueueItem, QueueKind } from "@web/types"
-import { cn } from "@web/lib/utils"
+import type { QueueItem } from "@web/types"
 import { formatMoney } from "@web/helper"
 import { calculateQueueAffordability } from "@/shared/allowance"
 import { Button } from "@web/components/ui/button"
@@ -14,15 +13,10 @@ type Props = {
   currency: string
 }
 
-const KINDS: { value: QueueKind; label: string }[] = [
-  { value: "want", label: "Wants" },
-  { value: "need", label: "Needs" }
-]
-
 export const QueueView = ({ currency }: Props) => {
-  const [kind, setKind] = useState<QueueKind>("want")
   const [title, setTitle] = useState("")
   const [price, setPrice] = useState("")
+  const [selectedTag, setSelectedTag] = useState<"Gift" | "Essential" | "Urgent">("Gift")
 
   const {
     items: serverItems,
@@ -33,7 +27,7 @@ export const QueueView = ({ currency }: Props) => {
     reorderList,
     purchase,
     removeItem
-  } = useQueue(kind)
+  } = useQueue("want")
 
   const [localItems, setLocalItems] = useState<QueueItem[]>([])
 
@@ -47,7 +41,9 @@ export const QueueView = ({ currency }: Props) => {
   const submitNewItem = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!canAdd) return
-    const ok = await addItem({ title: title.trim(), price: priceValue })
+    const fullTitle = `[${selectedTag}] ${title.trim()}`
+    const coolingDays = selectedTag === "Urgent" ? 0 : selectedTag === "Essential" ? 1 : 3
+    const ok = await addItem({ title: fullTitle, price: priceValue, coolingDays })
     if (ok) {
       setTitle("")
       setPrice("")
@@ -96,19 +92,12 @@ export const QueueView = ({ currency }: Props) => {
       {/* Top Fund Status Banner */}
       <div className="flex items-center justify-between rounded-3xl border bg-card p-4 shadow-sm sm:p-5">
         <div className="flex items-center gap-3">
-          <div
-            className={cn(
-              "flex size-10 items-center justify-center rounded-2xl",
-              kind === "want"
-                ? "bg-purple-500/10 text-purple-600 dark:text-purple-400"
-                : "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-            )}
-          >
-            {kind === "want" ? <Sparkles className="size-5" /> : <ShieldCheck className="size-5" />}
+          <div className="flex size-10 items-center justify-center rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
+            <Gift className="size-5" />
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {kind === "want" ? "Want Fund Balance" : "Needs Reserve"}
+              Want Fund (Wishlist Vault)
             </p>
             <p className="tabular text-xl font-extrabold text-foreground">
               {formatMoney(currentBalanceMinor, currency)}
@@ -116,7 +105,7 @@ export const QueueView = ({ currency }: Props) => {
           </div>
         </div>
 
-        {kind === "want" && projectedDailySweepMinor > 0 && (
+        {projectedDailySweepMinor > 0 && (
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Daily Accumulation</p>
             <p className="tabular text-sm font-bold text-emerald-600 dark:text-emerald-400">
@@ -126,27 +115,14 @@ export const QueueView = ({ currency }: Props) => {
         )}
       </div>
 
-      {/* Track selector + Form in Card */}
+      {/* Priority Wishlist Card */}
       <div className="space-y-4 rounded-3xl border bg-card p-4 shadow-sm sm:p-5">
         <div className="flex items-center justify-between">
-          <div className="flex shrink-0 items-center gap-1 rounded-full bg-muted p-1">
-            {KINDS.map((k) => (
-              <Button
-                key={k.value}
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => setKind(k.value)}
-                className={cn(
-                  "h-7 rounded-full px-3 text-xs font-semibold",
-                  kind === k.value
-                    ? "bg-card text-foreground shadow-sm hover:bg-card"
-                    : "text-muted-foreground"
-                )}
-              >
-                {k.label}
-              </Button>
-            ))}
+          <div>
+            <h3 className="text-sm font-bold text-foreground">Priority Wishlist Queue</h3>
+            <p className="text-xs text-muted-foreground">
+              Ranked items funded automatically by daily underspend sweeps. Drag or use arrows to prioritize.
+            </p>
           </div>
 
           <span className="text-xs text-muted-foreground">
@@ -154,36 +130,67 @@ export const QueueView = ({ currency }: Props) => {
           </span>
         </div>
 
-        {/* Add new queue item form */}
-        <form onSubmit={submitNewItem} className="flex items-center gap-2">
-          <Input
-            placeholder={kind === "want" ? "e.g. Mechanical Keyboard" : "e.g. Health Insurance"}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="flex-1 text-sm"
-          />
-          <Input
-            className="w-28 text-sm"
-            inputMode="decimal"
-            placeholder="0.00"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-          />
-          <Button type="submit" disabled={!canAdd} className="gap-1 text-xs font-semibold">
-            <Plus className="size-4" /> Add to {kind === "want" ? "Wants" : "Needs"}
-          </Button>
+        {/* Tag Selector & Add Form */}
+        <form onSubmit={submitNewItem} className="space-y-2.5">
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-xs font-semibold text-muted-foreground">Tag:</span>
+            {(["Gift", "Essential", "Urgent"] as const).map((tag) => {
+              const isSelected = selectedTag === tag
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setSelectedTag(tag)}
+                  className={`rounded-full border px-2.5 py-0.5 text-xs font-bold transition-all ${
+                    isSelected
+                      ? tag === "Urgent"
+                        ? "border-rose-500 bg-rose-500 text-white"
+                        : tag === "Essential"
+                          ? "border-blue-500 bg-blue-500 text-white"
+                          : "border-purple-500 bg-purple-500 text-white"
+                      : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  {tag}
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder={
+                selectedTag === "Gift"
+                  ? "e.g. Mechanical Keyboard, Sneakers, Game"
+                  : selectedTag === "Essential"
+                    ? "e.g. Winter Jacket, Laptop Repair, Glasses"
+                    : "e.g. Urgent Medicine, Bike Service"
+              }
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="flex-1 text-sm"
+            />
+            <Input
+              className="w-28 text-sm font-semibold tabular"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+            />
+            <Button type="submit" disabled={!canAdd} className="gap-1 text-xs font-semibold">
+              <Plus className="size-4" /> Add Item
+            </Button>
+          </div>
         </form>
 
         {/* Reorderable Items List */}
         {localItems.length === 0 ? (
           <div className="rounded-2xl border border-dashed py-10 text-center">
             <p className="text-sm font-medium text-muted-foreground">
-              Nothing queued in {kind === "want" ? "Wants" : "Needs"} yet.
+              Your wishlist is empty.
             </p>
             <p className="mt-1 text-xs text-muted-foreground/80">
-              {kind === "want"
-                ? "Add things you desire. Daily underspend sweeps will automatically fund them."
-                : "Add essential items that draw from your standing reserve."}
+              Add goals and desires above. Daily underspend sweeps will automatically fund them in order of priority!
             </p>
           </div>
         ) : (

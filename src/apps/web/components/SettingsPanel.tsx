@@ -3,13 +3,6 @@ import { toast } from "sonner"
 import { AlertTriangle, MessageCircle, Settings as SettingsIcon, Tags, Trash2 } from "lucide-react"
 import { trpc } from "@web/trpc"
 import type { TransactionType } from "@/shared/types"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle
-} from "@web/components/ui/dialog"
 import { Button } from "@web/components/ui/button"
 import { Input } from "@web/components/ui/input"
 import { Label } from "@web/components/ui/label"
@@ -24,7 +17,7 @@ import {
 import { cn } from "@web/lib/utils"
 import { CURRENCIES, TIMEZONES } from "@web/lib/locale"
 
-const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
+const SettingsPanel = () => {
   const utils = trpc.useUtils()
   const settingsQuery = trpc.settings.get.useQuery()
   const linksQuery = trpc.telegram.listLinks.useQuery()
@@ -57,13 +50,11 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
   const saveCurrency = (currency: string) =>
     attempt(async () => {
       await setCurrency.mutateAsync({ currency })
-      // The dashboard hero, summary stats, and activity rows all format amounts in
-      // the account default currency, so invalidate them too — otherwise they keep
-      // the old symbol until a full page reload.
       await Promise.all([
         settingsQuery.refetch(),
-        utils.insights.summary.invalidate(),
-        utils.transactions.list.invalidate()
+        utils.transactions.summary.invalidate(),
+        utils.transactions.list.invalidate(),
+        utils.cycles.current.invalidate()
       ])
       toast.success("Default currency updated")
     }, "Couldn't update currency — try again.")
@@ -71,22 +62,23 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
   const saveTimezone = (timezone: string) =>
     attempt(async () => {
       await updateSettings.mutateAsync({ timezone })
-      await settingsQuery.refetch()
+      await Promise.all([
+        settingsQuery.refetch(),
+        utils.transactions.summary.invalidate(),
+        utils.transactions.list.invalidate(),
+        utils.cycles.current.invalidate()
+      ])
       toast.success("Timezone updated")
     }, "Couldn't update timezone — try again.")
 
-  const submitCode = async () => {
+  const submitCode = () => {
     if (!code.trim()) return
-    try {
-      await confirmLink.mutateAsync({ code: code.trim() })
+    attempt(async () => {
+      await confirmLink.mutateAsync({ code: code.trim().toUpperCase() })
       setCode("")
       await linksQuery.refetch()
-      toast.success("Telegram connected")
-    } catch (e) {
-      toast.error(
-        e instanceof Error ? e.message : "Couldn't connect — check the code and try again."
-      )
-    }
+      toast.success("Telegram connected ✓")
+    }, "Couldn't link Telegram — check the code and try again.")
   }
 
   const removeLink = (chatId: number) =>
@@ -116,8 +108,6 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
   const confirmDelete = async () => {
     try {
       await deleteAccount.mutateAsync()
-      // The session cookie is HttpOnly, so it must be cleared server-side. A full
-      // reload then drops us back on the auth screen with no stale cached data.
       await fetch("/api/auth/logout", { method: "POST" })
       window.location.href = "/"
     } catch (e) {
@@ -130,89 +120,85 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
   const links = linksQuery.data?.items ?? []
 
   return (
-    <Dialog
-      open
-      onOpenChange={(next) => {
-        if (!next) onClose()
-      }}
-    >
-      <DialogContent className="max-h-[90vh] gap-0 overflow-y-auto p-0 sm:max-w-lg">
-        <DialogHeader className="px-6 pt-6">
-          <DialogTitle>Settings</DialogTitle>
-          <DialogDescription>Manage your defaults, integrations, and categories.</DialogDescription>
-        </DialogHeader>
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-xl font-bold tracking-tight text-foreground">Settings & Preferences</h2>
+        <p className="text-xs text-muted-foreground">Manage your defaults, integrations, and categories</p>
+      </div>
 
-        <Tabs defaultValue="general" className="gap-0 px-6 py-6">
+      <div className="rounded-3xl border bg-card p-4 shadow-sm sm:p-6">
+        <Tabs defaultValue="general" className="gap-0">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="general">
-              <SettingsIcon />
-              <span className="hidden sm:inline">General</span>
+            <TabsTrigger value="general" className="gap-1.5">
+              <SettingsIcon className="size-4" />
+              <span>General</span>
             </TabsTrigger>
-            <TabsTrigger value="telegram">
-              <MessageCircle />
-              <span className="hidden sm:inline">Telegram</span>
+            <TabsTrigger value="telegram" className="gap-1.5">
+              <MessageCircle className="size-4" />
+              <span>Telegram</span>
             </TabsTrigger>
-            <TabsTrigger value="categories">
-              <Tags />
-              <span className="hidden sm:inline">Categories</span>
+            <TabsTrigger value="categories" className="gap-1.5">
+              <Tags className="size-4" />
+              <span>Categories</span>
             </TabsTrigger>
           </TabsList>
 
           {/* General */}
-          <TabsContent value="general" className="mt-6 flex flex-col gap-2">
-            <Label htmlFor="settings-currency">Default currency</Label>
-            <Select
-              value={settings?.defaultCurrency ?? "USD"}
-              onValueChange={saveCurrency}
-              disabled={settings?.currencyLocked}
-            >
-              <SelectTrigger id="settings-currency" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CURRENCIES.map((c) => (
-                  <SelectItem key={c} value={c} className="tabular">
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {settings?.currencyLocked
-                ? "Locked because you already have transactions — every transaction is stored in this currency."
-                : "Every transaction is stored in this currency. It locks once you add your first transaction."}
-            </p>
+          <TabsContent value="general" className="mt-6 space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="settings-currency">Default currency</Label>
+              <Select
+                value={settings?.defaultCurrency ?? "USD"}
+                onValueChange={saveCurrency}
+                disabled={settings?.currencyLocked}
+              >
+                <SelectTrigger id="settings-currency" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENCIES.map((c) => (
+                    <SelectItem key={c} value={c} className="tabular">
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {settings?.currencyLocked
+                  ? "Locked because you already have transactions — every transaction is stored in this currency."
+                  : "Every transaction is stored in this currency. It locks once you add your first transaction."}
+              </p>
+            </div>
 
-            <Label htmlFor="settings-timezone" className="mt-4">
-              Timezone
-            </Label>
-            <Select value={settings?.timezone ?? "UTC"} onValueChange={saveTimezone}>
-              <SelectTrigger id="settings-timezone" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(TIMEZONES.includes(settings?.timezone ?? "UTC")
-                  ? TIMEZONES
-                  : [settings!.timezone, ...TIMEZONES]
-                ).map((tz) => (
-                  <SelectItem key={tz} value={tz}>
-                    {tz}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Used to resolve dates like "yesterday" and to bucket monthly summaries.
-            </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="settings-timezone">Timezone</Label>
+              <Select value={settings?.timezone ?? "UTC"} onValueChange={saveTimezone}>
+                <SelectTrigger id="settings-timezone" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(TIMEZONES.includes(settings?.timezone ?? "UTC")
+                    ? TIMEZONES
+                    : [settings!.timezone, ...TIMEZONES]
+                  ).map((tz) => (
+                    <SelectItem key={tz} value={tz}>
+                      {tz}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Used to resolve dates like &quot;yesterday&quot; and to bucket daily pacing allowances.
+              </p>
+            </div>
 
-            <div className="mt-8 rounded-md border border-destructive/40 p-4">
+            <div className="mt-8 rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
                 <div className="flex flex-col gap-1">
-                  <p className="text-sm font-medium">Delete account</p>
+                  <p className="text-sm font-semibold text-destructive">Delete account</p>
                   <p className="text-xs text-muted-foreground">
-                    Permanently deletes your account and everything in it — transactions,
-                    categories, and Telegram connections. This can't be undone.
+                    Permanently deletes your account, cycles, transactions, categories, and Telegram links. This cannot be undone.
                   </p>
                 </div>
               </div>
@@ -229,7 +215,7 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
               ) : (
                 <div className="mt-3 flex flex-col gap-2">
                   <Label htmlFor="settings-delete-confirm" className="text-xs">
-                    Type <span className="font-medium">{settings?.email}</span> to confirm
+                    Type <span className="font-semibold text-foreground">{settings?.email}</span> to confirm
                   </Label>
                   <Input
                     id="settings-delete-confirm"
@@ -268,35 +254,38 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
           </TabsContent>
 
           {/* Telegram */}
-          <TabsContent value="telegram" className="mt-6 flex flex-col gap-2">
-            <Label htmlFor="settings-code">Connect Telegram</Label>
-            <p className="text-xs text-muted-foreground">
-              {settings?.botUsername ? (
-                <>
-                  Open{" "}
-                  <a
-                    href={`https://t.me/${settings.botUsername}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-medium text-primary underline underline-offset-2"
-                  >
-                    @{settings.botUsername}
-                  </a>{" "}
-                  in Telegram, send{" "}
-                  <code className="rounded bg-muted px-1 py-0.5 tabular">/link</code>, then enter
-                  the code it gives you here.
-                </>
-              ) : (
-                <>
-                  Send <code className="rounded bg-muted px-1 py-0.5 tabular">/link</code> to the
-                  bot, then enter the code it gives you.
-                </>
-              )}
-            </p>
+          <TabsContent value="telegram" className="mt-6 space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="settings-code">Connect Telegram Bot</Label>
+              <p className="text-xs text-muted-foreground">
+                {settings?.botUsername ? (
+                  <>
+                    Open{" "}
+                    <a
+                      href={`https://t.me/${settings.botUsername}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-primary underline underline-offset-2"
+                    >
+                      @{settings.botUsername}
+                    </a>{" "}
+                    in Telegram, send{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 tabular">/link</code>, then enter
+                    the 6-digit code here.
+                  </>
+                ) : (
+                  <>
+                    Send <code className="rounded bg-muted px-1 py-0.5 tabular">/link</code> to the
+                    bot, then enter the code here.
+                  </>
+                )}
+              </p>
+            </div>
+
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 id="settings-code"
-                placeholder="Enter code"
+                placeholder="Enter 6-digit code"
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
                 onKeyDown={(e) => {
@@ -310,13 +299,13 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
             </div>
 
             {links.length > 0 ? (
-              <ul className="mt-2 flex flex-col gap-1">
+              <ul className="mt-3 flex flex-col gap-1.5">
                 {links.map((link) => (
                   <li
                     key={link.chatId}
-                    className="flex items-center justify-between gap-2 rounded-md border bg-card px-3 py-2"
+                    className="flex items-center justify-between gap-2 rounded-xl border bg-background px-3.5 py-2.5"
                   >
-                    <span className="truncate text-sm">
+                    <span className="truncate text-sm font-medium">
                       {link.username ? (
                         `@${link.username}`
                       ) : (
@@ -330,16 +319,22 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
                 ))}
               </ul>
             ) : (
-              <div className="mt-2 flex flex-col items-center gap-2 rounded-md border border-dashed px-6 py-8 text-center">
+              <div className="mt-3 flex flex-col items-center gap-2 rounded-2xl border border-dashed px-6 py-8 text-center">
                 <MessageCircle className="size-6 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">No chats connected yet</p>
+                <p className="text-sm text-muted-foreground">No Telegram accounts linked yet</p>
               </div>
             )}
           </TabsContent>
 
           {/* Categories */}
-          <TabsContent value="categories" className="mt-6 flex flex-col gap-2">
-            <Label htmlFor="settings-cat">Categories</Label>
+          <TabsContent value="categories" className="mt-6 space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="settings-cat">Categories</Label>
+              <p className="text-xs text-muted-foreground">
+                Custom categories used by the AI command parser and manual logs.
+              </p>
+            </div>
+
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 id="settings-cat"
@@ -374,50 +369,51 @@ const SettingsPanel = ({ onClose }: { onClose: () => void }) => {
             </div>
 
             {categories.length > 0 ? (
-              <ul className="mt-2 flex flex-col gap-1">
+              <ul className="mt-3 flex flex-col gap-1.5">
                 {categories.map((cat) => (
                   <li
                     key={cat.id}
-                    className="flex items-center justify-between gap-2 rounded-md border bg-card px-3 py-2"
+                    className="flex items-center justify-between gap-2 rounded-xl border bg-background px-3.5 py-2.5"
                   >
                     <span className="flex items-center gap-2 truncate text-sm">
                       <span
                         className={cn(
-                          "size-1.5 shrink-0 rounded-full",
+                          "size-2 shrink-0 rounded-full",
                           cat.type === "Income" ? "bg-income" : "bg-expense"
                         )}
                       />
-                      <span className="truncate">{cat.name}</span>
+                      <span className="truncate font-medium">{cat.name}</span>
                       <span
                         className={cn(
-                          "text-xs",
+                          "text-xs font-semibold",
                           cat.type === "Income" ? "text-income" : "text-expense"
                         )}
                       >
-                        {cat.type}
+                        ({cat.type})
                       </span>
                     </span>
                     <Button
                       variant="ghost"
-                      size="icon-sm"
+                      size="icon"
                       onClick={() => removeCategory(cat.id)}
                       aria-label={`Delete ${cat.name}`}
+                      className="size-8 text-muted-foreground hover:text-destructive"
                     >
-                      <Trash2 />
+                      <Trash2 className="size-4" />
                     </Button>
                   </li>
                 ))}
               </ul>
             ) : (
-              <div className="mt-2 flex flex-col items-center gap-2 rounded-md border border-dashed px-6 py-8 text-center">
+              <div className="mt-3 flex flex-col items-center gap-2 rounded-2xl border border-dashed px-6 py-8 text-center">
                 <Tags className="size-6 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">No categories yet</p>
               </div>
             )}
           </TabsContent>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   )
 }
 

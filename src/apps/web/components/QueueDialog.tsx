@@ -12,9 +12,9 @@ const QueueDialog = ({ open, onOpenChange, currency }: Props) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Needs & Wants</DialogTitle>
+          <DialogTitle>Priority Wishlist & Goals</DialogTitle>
           <DialogDescription>
-            Wants draw from your Want Fund. Needs draw from your standing reserve.
+            Ranked goals and wishlist items funded automatically by your daily spending discipline.
           </DialogDescription>
         </DialogHeader>
         <QueueView currency={currency} />

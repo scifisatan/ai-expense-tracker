@@ -4,7 +4,7 @@ import { useAuth } from "@web/hooks/useAuth"
 import { trpc } from "@web/trpc"
 
 import Dashboard from "@web/components/Dashboard"
-import AuthScreen from "@web/components/AuthScreen"
+import LandingPage from "@web/marketing/LandingPage"
 import OnboardingScreen from "@web/components/OnboardingScreen"
 import { Skeleton } from "@web/components/ui/skeleton"
 
@@ -28,7 +28,7 @@ export const App = () => {
 
   if (isLoading) return <LoadingScreen />
 
-  if (!session?.authenticated) return <AuthScreen />
+  if (!session?.authenticated) return <LandingPage />
 
   if (settingsQuery.isPending || !settingsQuery.data) return <LoadingScreen />
 

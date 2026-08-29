@@ -42,6 +42,56 @@ ${buildCategoryRule(categories)}
 - If no clear amounts are found, return: {"items":[]}
 - Do not include markdown, backticks, or extra text.`
 
+const parseHeuristicTransactions = (
+  message: string,
+  today: string,
+  categories: { expense: string[]; income: string[] }
+): TransactionsExtraction => {
+  const text = message.trim()
+  if (!text) return { items: [] }
+
+  const lines = text.split(/[\n,;]+/).map((l) => l.trim()).filter(Boolean)
+  const items: TransactionsExtraction["items"] = []
+
+  for (const line of lines) {
+    // Look for numbers like 150, 15.50, $20, 20$, 500rs, etc.
+    const numMatch = line.match(/(?:^|[^\d.])(?:[$€£¥₹Rs.]*\s*)(\d+(?:\.\d{1,2})?)(?:\s*[$€£¥₹Rs.]*)?(?:[^\d.]|$)/i)
+    if (!numMatch || !numMatch[1]) continue
+
+    const amount = Number(numMatch[1])
+    if (!Number.isFinite(amount) || amount <= 0) continue
+
+    // Extract note by removing the number
+    let note = line.replace(numMatch[1], "").replace(/[$€£¥₹Rs.]/g, "").trim()
+    note = note.replace(/^(spent|paid|bought|got|received|income|expense|for|on)\s+/i, "").trim()
+    note = note.replace(/\s+(yesterday|today|last night)$/i, "").trim()
+    if (!note) note = "Quick Entry"
+
+    const isIncome = /\b(salary|income|received|paycheck|dividend|bonus|freelance|client|sold)\b/i.test(line)
+    const type: "Income" | "Expense" = isIncome ? "Income" : "Expense"
+
+    const pool = type === "Income" ? categories.income : categories.expense
+    const matchedCategory = pool.find((cat) => note.toLowerCase().includes(cat.toLowerCase()))
+
+    let occurredAt: string | undefined = undefined
+    if (/\byesterday\b/i.test(line)) {
+      const d = new Date(today)
+      d.setDate(d.getDate() - 1)
+      occurredAt = d.toISOString().slice(0, 10)
+    }
+
+    items.push({
+      amount,
+      type,
+      note,
+      category: matchedCategory,
+      occurredAt
+    })
+  }
+
+  return { items }
+}
+
 export const createAiService = (options: {
   model: string
   groqApiKey: string
@@ -52,16 +102,18 @@ export const createAiService = (options: {
       today: string,
       categories: { expense: string[]; income: string[] },
     ): Promise<TransactionsExtraction> {
+      if (!options.groqApiKey) {
+        log.ai.debug("ai.extractTransactions.fallback_heuristic", "no apiKey provided")
+        return parseHeuristicTransactions(message, today, categories)
+      }
+
       const groq = createGroq({ apiKey: options.groqApiKey })
-      const model = groq(options.model)
+      const model = groq(options.model || "llama-3.3-70b-versatile")
       const system = buildSystemPrompt(today, categories)
 
       log.ai.debug("ai.extractTransactions.model", options.model)
       log.ai.debug("ai.extractTransactions.prompt", message)
 
-      // The model intermittently emits JSON that fails the schema (or fails JSON
-      // mode outright). These failures are stochastic, so simply re-sampling clears
-      // most of them — try up to MAX_ATTEMPTS times before giving up.
       const MAX_ATTEMPTS = 3
       let lastError: unknown
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -87,7 +139,11 @@ export const createAiService = (options: {
         }
       }
 
-      log.ai.error("ai.extractTransactions.failed", lastError)
+      log.ai.warn("ai.extractTransactions.falling_back_to_heuristic", lastError)
+      const fallbackResult = parseHeuristicTransactions(message, today, categories)
+      if (fallbackResult.items.length > 0) {
+        return fallbackResult
+      }
       throw lastError
     },
   }

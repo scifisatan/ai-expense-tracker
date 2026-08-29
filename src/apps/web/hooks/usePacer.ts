@@ -7,7 +7,9 @@ export function usePacer() {
   const { data: snapshot, isLoading, refetch } = trpc.cycles.current.useQuery()
   const { data: lastCompleted, refetch: refetchLastCompleted } = trpc.cycles.lastCompleted.useQuery()
   const createMutation = trpc.cycles.create.useMutation()
+  const updateMutation = trpc.cycles.update.useMutation()
   const closeMutation = trpc.cycles.close.useMutation()
+  const depositMutation = trpc.cycles.depositSavings.useMutation()
 
   const [status, setStatus] = useState<{ kind: "success" | "error"; text: string } | null>(null)
 
@@ -26,10 +28,39 @@ export function usePacer() {
     try {
       await createMutation.mutateAsync(input)
       flash("success", "Cycle started ✓")
-      await Promise.all([refetch(), refetchLastCompleted(), utils.cycles.review.invalidate()])
+      await Promise.all([
+        refetch(),
+        refetchLastCompleted(),
+        utils.cycles.review.invalidate(),
+        utils.transactions.summary.invalidate(),
+        utils.transactions.list.invalidate()
+      ])
       return true
     } catch {
       flash("error", "Failed to start the cycle.", 3000)
+      return false
+    }
+  }
+
+  const updateCycle = async (input: {
+    id: number
+    gross?: number
+    sweepPct?: number
+    allocations?: { kind: AllocationKind; label: string; amount: number }[]
+  }) => {
+    try {
+      await updateMutation.mutateAsync(input)
+      flash("success", "Allocations updated ✓")
+      await Promise.all([
+        refetch(),
+        refetchLastCompleted(),
+        utils.cycles.review.invalidate(),
+        utils.transactions.summary.invalidate(),
+        utils.transactions.list.invalidate()
+      ])
+      return true
+    } catch {
+      flash("error", "Failed to update allocations.", 3000)
       return false
     }
   }
@@ -46,13 +77,33 @@ export function usePacer() {
     }
   }
 
+  const depositSavings = async (input: { amount: number; note?: string }) => {
+    try {
+      await depositMutation.mutateAsync(input)
+      flash("success", "Deposited to Savings Vault ✓")
+      await Promise.all([
+        refetch(),
+        refetchLastCompleted(),
+        utils.cycles.review.invalidate(),
+        utils.transactions.summary.invalidate(),
+        utils.transactions.list.invalidate()
+      ])
+      return true
+    } catch {
+      flash("error", "Failed to deposit into Savings.", 3000)
+      return false
+    }
+  }
+
   return {
     snapshot,
     lastCompleted,
     isLoading,
     status,
     startCycle,
+    updateCycle,
     closeCycle,
+    depositSavings,
     refetch
   }
 }

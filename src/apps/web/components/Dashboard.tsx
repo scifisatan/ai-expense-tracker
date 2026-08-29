@@ -5,12 +5,12 @@ import {
   History,
   ListTodo,
   LogOut,
-  PieChart,
   Settings as SettingsIcon,
   Wallet,
   Menu,
   X,
-  ChevronRight
+  ChevronRight,
+  PlusCircle
 } from "lucide-react"
 import { useTransaction } from "../hooks/useTransaction"
 import BalanceHero from "./BalanceHero"
@@ -20,6 +20,7 @@ import ActivityFeed from "./ActivityFeed"
 import ActivityItem from "./ActivityItem"
 import SettingsPanel from "./SettingsPanel"
 import ThemeToggle from "./ThemeToggle"
+import TransactionDialog from "./TransactionDialog"
 import { QueueView } from "./QueueView"
 import { Button } from "@web/components/ui/button"
 import { cn } from "@web/lib/utils"
@@ -32,7 +33,7 @@ import {
   DropdownMenuTrigger
 } from "@web/components/ui/dropdown-menu"
 
-type View = "dashboard" | "transactions" | "wishlist" | "overview" | "settings"
+type View = "dashboard" | "transactions" | "wishlist" | "settings"
 
 const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => void }) => {
   const {
@@ -49,6 +50,7 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
 
   const [currentView, setCurrentView] = useState<View>("dashboard")
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [addIncomeOpen, setAddIncomeOpen] = useState(false)
   const currency = summary?.currency ?? "USD"
 
   // Surface the hook's status as a toast.
@@ -73,8 +75,7 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
   const NAV_ITEMS = [
     { id: "dashboard" as View, label: "Dashboard", icon: Compass, description: "Daily pacer & command center" },
     { id: "transactions" as View, label: "Transactions", icon: History, description: "Search & transaction history" },
-    { id: "wishlist" as View, label: "Wishlist & Queue", icon: ListTodo, description: "Needs & Wants timeline" },
-    { id: "overview" as View, label: "Overview", icon: PieChart, description: "Total balance & trends" },
+    { id: "wishlist" as View, label: "Priority Wishlist", icon: ListTodo, description: "Ranked wishlist & goal timeline" },
     { id: "settings" as View, label: "Settings", icon: SettingsIcon, description: "Preferences & accounts" }
   ]
 
@@ -231,21 +232,30 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
         )}
 
         {/* Page Content Body */}
-        <main className="flex-1 px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
-          <div className="mx-auto max-w-5xl">
+        <main className="flex-1 px-3 py-4 sm:px-5 sm:py-5 lg:px-6">
+          <div className="w-full">
             {/* VIEW 1: Main Dashboard Command Center */}
             {currentView === "dashboard" && (
-              <div className="space-y-6">
+              <div className="space-y-5">
                 {/* 2-Column Grid on Desktop */}
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
                   {/* Left Main Column: Pacer + Quick Entry */}
-                  <div className="space-y-5 lg:col-span-7">
+                  <div className="space-y-5 lg:col-span-7 xl:col-span-7">
                     <TodayCard />
 
                     <div className="space-y-2">
-                      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Quick Entry
-                      </h3>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          Quick Entry
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => setAddIncomeOpen(true)}
+                          className="flex items-center gap-1 text-xs font-semibold text-primary transition-colors hover:underline"
+                        >
+                          <PlusCircle className="size-3.5" /> + Add Income / Paycheck
+                        </button>
+                      </div>
                       <CommandBar
                         categories={categories}
                         currency={currency}
@@ -331,9 +341,9 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
             {currentView === "wishlist" && (
               <div className="space-y-4">
                 <div>
-                  <h2 className="text-xl font-bold tracking-tight text-foreground">Wishlist & Queue</h2>
+                  <h2 className="text-xl font-bold tracking-tight text-foreground">Priority Wishlist & Goals</h2>
                   <p className="text-xs text-muted-foreground">
-                    Prioritize your desires with automatic daily sweeps and cooling-off timers
+                    Rank and track desired purchases funded automatically by your daily spending pace
                   </p>
                 </div>
 
@@ -341,43 +351,21 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
               </div>
             )}
 
-            {/* VIEW 4: Overview & Balance Analytics */}
-            {currentView === "overview" && (
-              <div className="space-y-5">
-                <div>
-                  <h2 className="text-xl font-bold tracking-tight text-foreground">Financial Overview</h2>
-                  <p className="text-xs text-muted-foreground">Macro balance and income vs expenses</p>
-                </div>
-
-                <BalanceHero
-                  balanceMinor={summary?.balance ?? 0}
-                  todayDeltaMinor={todayDeltaMinor}
-                  incomeMinor={summary?.income ?? 0}
-                  expenseMinor={summary?.expense ?? 0}
-                  currency={currency}
-                />
-
-                <div className="space-y-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Log Transaction
-                  </h3>
-                  <CommandBar
-                    categories={categories}
-                    currency={currency}
-                    onCreate={createTransaction}
-                    onAddFromText={addFromText}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* VIEW 5: Settings Panel */}
-            {currentView === "settings" && (
-              <SettingsPanel onClose={() => setCurrentView("dashboard")} />
-            )}
+            {/* VIEW 4: Settings Panel */}
+            {currentView === "settings" && <SettingsPanel />}
           </div>
         </main>
       </div>
+
+      {/* Quick Add Income / Salary Dialog */}
+      <TransactionDialog
+        open={addIncomeOpen}
+        onOpenChange={setAddIncomeOpen}
+        categories={categories}
+        currency={currency}
+        mode="create"
+        onCreate={createTransaction}
+      />
     </div>
   )
 }

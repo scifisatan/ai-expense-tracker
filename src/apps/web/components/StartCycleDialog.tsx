@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Plus, Trash2, Home, Heart, PiggyBank, ShieldCheck, Tv, Zap, MoreHorizontal } from "lucide-react"
+import { Plus, Trash2, Home, Heart, PiggyBank, Tv, Zap, MoreHorizontal } from "lucide-react"
 import type { AllocationKind } from "@/shared/types"
 import {
   Dialog,
@@ -29,11 +29,10 @@ export type AllocationPreset = {
 
 export const PRESET_ALLOCATIONS: AllocationPreset[] = [
   { id: "rent", kind: "fixed", label: "Rent / Housing", icon: Home },
-  { id: "family", kind: "family", label: "Family Support", icon: Heart },
-  { id: "savings", kind: "savings", label: "Savings", icon: PiggyBank },
-  { id: "needs_reserve", kind: "needs_reserve", label: "Needs Reserve", icon: ShieldCheck },
-  { id: "subscriptions", kind: "subscriptions", label: "Subscriptions", icon: Tv },
+  { id: "savings", kind: "savings", label: "Savings Vault", icon: PiggyBank },
   { id: "utilities", kind: "fixed", label: "Utilities & Bills", icon: Zap },
+  { id: "subscriptions", kind: "subscriptions", label: "Subscriptions", icon: Tv },
+  { id: "family", kind: "family", label: "Family Support", icon: Heart },
   { id: "custom", kind: "other", label: "Custom", icon: MoreHorizontal }
 ]
 
@@ -77,9 +76,15 @@ const defaultAllocation = (presetId = "rent"): AllocationDraft => {
   }
 }
 
+const defaultEndIso = (startStr?: string) => {
+  const base = startStr ? new Date(startStr) : new Date()
+  base.setDate(base.getDate() + 29)
+  return base.toISOString().slice(0, 10)
+}
+
 const StartCycleDialog = ({ open, onOpenChange, initialValues, onStart }: Props) => {
   const [startDate, setStartDate] = useState(todayIso())
-  const [endDate, setEndDate] = useState("")
+  const [endDate, setEndDate] = useState(() => defaultEndIso())
   const [gross, setGross] = useState("")
   const [sweepPct, setSweepPct] = useState("50")
   const [allocations, setAllocations] = useState<AllocationDraft[]>([])
@@ -89,16 +94,17 @@ const StartCycleDialog = ({ open, onOpenChange, initialValues, onStart }: Props)
     if (!open) return
 
     if (initialValues) {
-      setStartDate(initialValues.startDate ?? todayIso())
-      setEndDate(initialValues.endDate ?? "")
+      const start = initialValues.startDate ?? todayIso()
+      setStartDate(start)
+      setEndDate(initialValues.endDate ?? defaultEndIso(start))
       setGross(initialValues.gross ? String(initialValues.gross) : "")
       setSweepPct(initialValues.sweepPct !== undefined ? String(initialValues.sweepPct) : "50")
       if (initialValues.allocations && initialValues.allocations.length > 0) {
         setAllocations(
           initialValues.allocations.map((a) => {
-            const matched = PRESET_ALLOCATIONS.find(
-              (p) => p.label.toLowerCase() === a.label.toLowerCase() || p.kind === a.kind
-            )
+            const matched =
+              PRESET_ALLOCATIONS.find((p) => p.label.toLowerCase() === a.label.toLowerCase()) ??
+              PRESET_ALLOCATIONS.find((p) => p.kind === a.kind && p.id !== "custom" && p.kind !== "fixed")
             return {
               presetId: matched ? matched.id : "custom",
               kind: a.kind,
@@ -112,8 +118,9 @@ const StartCycleDialog = ({ open, onOpenChange, initialValues, onStart }: Props)
         setAllocations([])
       }
     } else {
-      setStartDate(todayIso())
-      setEndDate("")
+      const start = todayIso()
+      setStartDate(start)
+      setEndDate(defaultEndIso(start))
       setGross("")
       setSweepPct("50")
       setAllocations([])

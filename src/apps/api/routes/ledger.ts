@@ -9,7 +9,7 @@ import { log } from "@/utils/logger";
 import type { Category } from "@/db/schema";
 import type { TransactionsExtraction } from "@/shared/types";
 
-const DEFAULT_AI_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+const DEFAULT_AI_MODEL = "llama-3.3-70b-versatile";
 const DEFAULT_AI_DAILY_LIMIT = 50;
 
 const categoryKey = (type: "Income" | "Expense", name: string) =>

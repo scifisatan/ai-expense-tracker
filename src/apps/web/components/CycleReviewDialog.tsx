@@ -1,4 +1,5 @@
-import { CheckCircle2, Sparkles, TrendingUp, Wallet, ArrowRight, ShieldCheck, HeartHandshake } from "lucide-react"
+import { CheckCircle2, Compass, TrendingUp, Wallet, ArrowRight, ShieldCheck, HeartHandshake, Gift } from "lucide-react"
+import { usePacer } from "@web/hooks/usePacer"
 import { trpc } from "@web/trpc"
 import { formatMoney } from "@web/helper"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@web/components/ui/dialog"
@@ -9,8 +10,7 @@ import type { AllocationKind } from "@/shared/types"
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  cycleId?: number
-  onStartNextCycle?: (prefill: {
+  onStartNextCycle: (prefill: {
     startDate: string
     gross: number
     sweepPct: number
@@ -18,28 +18,29 @@ type Props = {
   }) => void
 }
 
-const CycleReviewDialog = ({ open, onOpenChange, cycleId, onStartNextCycle }: Props) => {
+// Comprehensive cycle performance review modal.
+// Displays discretionary pool, actual spent, swept surplus into Want Fund, and rollover pre-fill.
+const CycleReviewDialog = ({ open, onOpenChange, onStartNextCycle }: Props) => {
+  const { lastCompleted } = usePacer()
+  const cycleId = lastCompleted?.cycle.id
+
   const { data: review, isLoading } = trpc.cycles.review.useQuery(
-    cycleId ? { id: cycleId } : undefined,
-    { enabled: open }
+    { id: cycleId! },
+    { enabled: open && typeof cycleId === "number" }
   )
 
-  if (!open) return null
-
-  const handleStartNext = () => {
+  const handleRollover = () => {
     if (!review) return
-    onOpenChange(false)
-    if (onStartNextCycle) {
-      // Start the next day after this cycle ended
-      const nextStart = review.endLocalDate
-        ? new Date(new Date(review.endLocalDate).getTime() + 86400000).toISOString().slice(0, 10)
-        : new Date().toISOString().slice(0, 10)
+    const nextStart = new Date(review.endLocalDate)
+    nextStart.setDate(nextStart.getDate() + 1)
+    const nextStartStr = nextStart.toISOString().slice(0, 10)
 
+    if (lastCompleted) {
       onStartNextCycle({
-        startDate: nextStart,
-        gross: review.cycle.grossMinor / 100,
-        sweepPct: review.cycle.sweepPct,
-        allocations: review.allocations.map((a) => ({
+        startDate: nextStartStr,
+        gross: lastCompleted.cycle.grossMinor / 100,
+        sweepPct: lastCompleted.cycle.sweepPct,
+        allocations: lastCompleted.allocations.map((a) => ({
           kind: a.kind as AllocationKind,
           label: a.label,
           amount: a.amountMinor / 100
@@ -53,7 +54,7 @@ const CycleReviewDialog = ({ open, onOpenChange, cycleId, onStartNextCycle }: Pr
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <div className="flex items-center gap-2 text-primary">
-            <Sparkles className="size-5" />
+            <Compass className="size-5" />
             <span className="text-xs font-semibold uppercase tracking-wider">Cycle Summary</span>
           </div>
           <DialogTitle className="text-xl font-bold">Pacing Review</DialogTitle>
@@ -108,7 +109,7 @@ const CycleReviewDialog = ({ open, onOpenChange, cycleId, onStartNextCycle }: Pr
               <div className="mt-2.5 grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-2.5">
                   <div className="flex size-8 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
-                    <Sparkles className="size-4" />
+                    <Gift className="size-4" />
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Want Fund</p>
@@ -156,7 +157,7 @@ const CycleReviewDialog = ({ open, onOpenChange, cycleId, onStartNextCycle }: Pr
 
             {/* Rollover CTA */}
             {onStartNextCycle && (
-              <Button onClick={handleStartNext} className="w-full gap-2">
+              <Button onClick={handleRollover} className="w-full gap-2">
                 <HeartHandshake className="size-4" />
                 Roll over & Start Next Cycle
                 <ArrowRight className="size-4" />

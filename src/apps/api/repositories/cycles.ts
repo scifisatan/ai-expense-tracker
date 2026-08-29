@@ -1,5 +1,5 @@
 import type { AppDb } from "@/db/client"
-import { and, asc, desc, eq, gt, isNotNull, isNull, lte, or } from "drizzle-orm"
+import { and, asc, desc, eq, gt, isNotNull, isNull, lte, or, sql } from "drizzle-orm"
 import { cycles, allocations } from "@/db/schema"
 import type { AllocationKind } from "@/db/schema"
 
@@ -88,11 +88,43 @@ export const createCyclesRepo = (db: AppDb) => ({
       orderBy: [asc(allocations.id)]
     }),
 
+  update: (accountId: string, id: number, patch: { grossMinor?: number; sweepPct?: number }) =>
+    db
+      .update(cycles)
+      .set(patch)
+      .where(and(eq(cycles.id, id), eq(cycles.accountId, accountId))),
+
+  replaceAllocations: async (cycleId: number, items: NewAllocationInput[]) => {
+    await db.delete(allocations).where(eq(allocations.cycleId, cycleId))
+    if (items.length === 0) return []
+    return db
+      .insert(allocations)
+      .values(
+        items.map((item) => ({
+          cycleId,
+          kind: item.kind,
+          label: item.label,
+          amountMinor: item.amountMinor
+        }))
+      )
+      .returning()
+  },
+
   close: (accountId: string, id: number) =>
     db
       .update(cycles)
       .set({ closedAt: new Date().toISOString() })
       .where(and(eq(cycles.id, id), eq(cycles.accountId, accountId))),
+
+  getAccumulatedSavings: async (accountId: string): Promise<number> => {
+    const result = await db
+      .select({ totalMinor: sql<number>`COALESCE(SUM(${allocations.amountMinor}), 0)` })
+      .from(allocations)
+      .innerJoin(cycles, eq(allocations.cycleId, cycles.id))
+      .where(and(eq(cycles.accountId, accountId), eq(allocations.kind, "savings")))
+      .get()
+    return result?.totalMinor ?? 0
+  },
 
   // Distinct accountIds with a still-open cycle, keyset-paginated for cron
   // fan-out. cursor is the last accountId seen.

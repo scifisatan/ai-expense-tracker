@@ -1,10 +1,18 @@
+import { z } from "zod"
 import { TRPCError } from "@trpc/server"
 import { t, protectedProcedure } from "../trpc"
-import { cycleCreateInputSchema, cycleCloseInputSchema, cycleReviewInputSchema } from "@/shared/types"
+import {
+  cycleCreateInputSchema,
+  cycleCloseInputSchema,
+  cycleReviewInputSchema,
+  cycleUpdateInputSchema
+} from "@/shared/types"
 import { toMinor } from "@/shared/money"
 import { startOfLocalDay, addDays, localDateString, parseDbTimestamp, toDbTimestamp, daysBetweenLocalDates } from "@/shared/datetime"
 import { daysToAfford, poolMinor } from "@/shared/allowance"
 import { computeCycleSnapshot } from "../lib/pacer"
+import { publishBalance } from "@api/lib/ledger"
+import { log } from "@/utils/logger"
 
 export const cyclesRouter = t.router({
   // The single aggregation point for "where do things stand right now" —
@@ -17,7 +25,12 @@ export const cyclesRouter = t.router({
     const snapshot = await computeCycleSnapshot(ctx, timezone)
     if (!snapshot.active) return { active: false as const }
 
-    const wantQueue = await ctx.repos.queue.listByAccount(ctx.accountId, "want")
+    const [wantQueue, currentAllocations, accumulatedSavingsMinor] = await Promise.all([
+      ctx.repos.queue.listByAccount(ctx.accountId, "want"),
+      ctx.repos.cycles.listAllocations(snapshot.cycle.id),
+      ctx.repos.cycles.getAccumulatedSavings(ctx.accountId)
+    ])
+
     const nearest = wantQueue[0]
     const nearestQueueItem = nearest
       ? {
@@ -41,6 +54,13 @@ export const cyclesRouter = t.router({
         endAt: snapshot.cycle.endAt,
         sweepPct: snapshot.cycle.sweepPct
       },
+      grossMinor: snapshot.cycle.grossMinor,
+      allocations: currentAllocations.map((a) => ({
+        id: a.id,
+        kind: a.kind,
+        label: a.label,
+        amountMinor: a.amountMinor
+      })),
       poolMinor: snapshot.poolMinor,
       allowanceMinor: snapshot.allowanceMinor,
       spentTodayMinor: snapshot.spentTodayMinor,
@@ -48,6 +68,7 @@ export const cyclesRouter = t.router({
       daysRemainingInclusive: snapshot.daysRemainingInclusive,
       wantFundMinor: snapshot.wantFundMinor,
       needsReserveMinor: snapshot.needsReserveMinor,
+      accumulatedSavingsMinor,
       nearestQueueItem
     }
   }),
@@ -146,7 +167,59 @@ export const cyclesRouter = t.router({
       }))
     )
 
+    if (input.gross > 0) {
+      await ctx.repos.transactions.insertOne(ctx.accountId, {
+        amountMinor: toMinor(input.gross, currency),
+        currency,
+        type: "Income",
+        categoryId: null,
+        note: "Starting Income / Salary",
+        occurredAt: startAt,
+        source: "web"
+      })
+      const newBalance = await ctx.repos.transactions.getNetBalance(ctx.accountId)
+      if (ctx.env?.BOT_TOKEN) {
+        ctx.waitUntil(
+          publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, currency)
+            .catch((error) => log.api.error("publish-balance", error))
+        )
+      }
+    }
+
     return { ok: true, cycle }
+  }),
+
+  update: protectedProcedure.input(cycleUpdateInputSchema).mutation(async ({ input, ctx }) => {
+    const cycle = await ctx.repos.cycles.findById(ctx.accountId, input.id)
+    if (!cycle) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Cycle not found" })
+    }
+
+    const currency = cycle.currency
+    const patch: { grossMinor?: number; sweepPct?: number } = {}
+    if (input.gross !== undefined) {
+      patch.grossMinor = toMinor(input.gross, currency)
+    }
+    if (input.sweepPct !== undefined) {
+      patch.sweepPct = input.sweepPct
+    }
+
+    if (Object.keys(patch).length > 0) {
+      await ctx.repos.cycles.update(ctx.accountId, input.id, patch)
+    }
+
+    if (input.allocations !== undefined) {
+      await ctx.repos.cycles.replaceAllocations(
+        input.id,
+        input.allocations.map((a) => ({
+          kind: a.kind,
+          label: a.label,
+          amountMinor: toMinor(a.amount, currency)
+        }))
+      )
+    }
+
+    return { ok: true }
   }),
 
   close: protectedProcedure.input(cycleCloseInputSchema).mutation(async ({ input, ctx }) => {
@@ -157,5 +230,61 @@ export const cyclesRouter = t.router({
 
     await ctx.repos.cycles.close(ctx.accountId, input.id)
     return { ok: true }
-  })
+  }),
+
+  depositSavings: protectedProcedure
+    .input(
+      z.object({
+        amount: z.number().positive(),
+        note: z.string().optional()
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const account = await ctx.repos.accounts.findById(ctx.accountId)
+      const timezone = account?.timezone ?? "UTC"
+      const currency = account?.defaultCurrency ?? "USD"
+      const amountMinor = toMinor(input.amount, currency)
+      const nowTs = toDbTimestamp(new Date())
+
+      const activeCycle = await ctx.repos.cycles.findOpenForDate(ctx.accountId, nowTs)
+      if (activeCycle) {
+        await ctx.repos.cycles.addAllocations(activeCycle.id, [
+          {
+            kind: "savings",
+            label: input.note?.trim() || "Savings Vault Deposit",
+            amountMinor
+          }
+        ])
+      }
+
+      const categories = await ctx.repos.categories.listByAccount(ctx.accountId)
+      const savingsCategory = categories.find(
+        (c) => c.name.toLowerCase() === "savings" && c.type === "Expense"
+      )
+
+      await ctx.repos.transactions.insertLedger({
+        accountId: ctx.accountId,
+        items: [
+          {
+            amountMinor,
+            type: "Expense",
+            note: input.note?.trim() || "Savings Vault Deposit",
+            currency,
+            categoryId: savingsCategory?.id ?? null,
+            categoryName: savingsCategory?.name ?? "Savings",
+            occurredAt: localDateString(timezone)
+          }
+        ],
+        source: "web",
+        fallbackNote: `Savings Deposit ${input.amount}`
+      })
+
+      const newBalance = await ctx.repos.transactions.getNetBalance(ctx.accountId)
+      ctx.waitUntil(
+        publishBalance(ctx.env.BOT_TOKEN, ctx.db, ctx.accountId, newBalance, currency)
+          .catch((error) => log.api.error("publish-balance", error))
+      )
+
+      return { ok: true, amountMinor }
+    })
 })

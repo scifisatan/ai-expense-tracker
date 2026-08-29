@@ -17,63 +17,55 @@
 :root {
   --radius: 1rem;
 
-  /* Light Palette (Earthy Sage, Cream & Warm Tan) */
-  --background: #fefae0;
-  --foreground: #283618;
+  /* Light Palette (#F0EBE3, #E4DCCF, #7D9D9C, #576F72) */
+  --background: #f0ebe3;
+  --foreground: #243133;
 
   --card: #ffffff;
-  --card-foreground: #283618;
+  --card-foreground: #243133;
   --popover: #ffffff;
-  --popover-foreground: #283618;
+  --popover-foreground: #243133;
 
-  --primary: #5f6f52;
-  --primary-foreground: #fefae0;
+  --primary: #576f72;
+  --primary-foreground: #f0ebe3;
 
-  --secondary: #f4eed0;
-  --secondary-foreground: #283618;
-  --muted: #f4eed0;
-  --muted-foreground: #5f6f52;
-  --accent: #b99470;
+  --secondary: #e4dccf;
+  --secondary-foreground: #243133;
+  --muted: #e4dccf;
+  --muted-foreground: #576f72;
+  --accent: #7d9d9c;
   --accent-foreground: #ffffff;
 
   --destructive: #bc4749;
   --destructive-foreground: #ffffff;
 
-  --border: #a9b388;
-  --input: #a9b388;
-  --ring: #5f6f52;
+  --border: #d6ccbe;
+  --input: #d6ccbe;
+  --ring: #576f72;
 
   /* Semantic money tokens */
-  --income: #5f6f52;
+  --income: #576f72;
   --income-foreground: #ffffff;
-  --income-muted: #e7eedd;
-  --expense: #b99470;
+  --income-muted: #dde8e7;
+  --expense: #b36b51;
   --expense-foreground: #ffffff;
-  --expense-muted: #f5ebe0;
+  --expense-muted: #faebe5;
 
   /* Chart palette */
-  --chart-1: #5f6f52;
-  --chart-2: #a9b388;
-  --chart-3: #b99470;
-  --chart-4: #606c38;
-  --chart-5: #283618;
+  --chart-1: #576f72;
+  --chart-2: #7d9d9c;
+  --chart-3: #e4dccf;
+  --chart-4: #a3b899;
+  --chart-5: #243133;
 
   --sidebar: #ffffff;
-  --sidebar-foreground: #283618;
-  --sidebar-primary: #5f6f52;
-  --sidebar-primary-foreground: #fefae0;
-  --sidebar-accent: #f4eed0;
-  --sidebar-accent-foreground: #5f6f52;
-  --sidebar-border: #a9b388;
-  --sidebar-ring: #5f6f52;
-
-  /* Gradients */
-  --linearPrimarySecondary: linear-gradient(#5f6f52, #a9b388);
-  --linearPrimaryAccent: linear-gradient(#5f6f52, #b99470);
-  --linearSecondaryAccent: linear-gradient(#a9b388, #b99470);
-  --radialPrimarySecondary: radial-gradient(#5f6f52, #a9b388);
-  --radialPrimaryAccent: radial-gradient(#5f6f52, #b99470);
-  --radialSecondaryAccent: radial-gradient(#a9b388, #b99470);
+  --sidebar-foreground: #243133;
+  --sidebar-primary: #576f72;
+  --sidebar-primary-foreground: #f0ebe3;
+  --sidebar-accent: #e4dccf;
+  --sidebar-accent-foreground: #576f72;
+  --sidebar-border: #d6ccbe;
+  --sidebar-ring: #576f72;
 }
 
 .dark {

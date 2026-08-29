@@ -18,13 +18,8 @@ const BalanceHero = ({ balanceMinor, todayDeltaMinor, incomeMinor, expenseMinor,
   const deltaUp = todayDeltaMinor >= 0
 
   return (
-    <section className="relative overflow-hidden rounded-3xl border bg-card p-7 shadow-sm sm:p-9">
-      {/* warm ambient glow */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-16 -top-20 size-56 rounded-full bg-primary/15 blur-3xl"
-      />
-      <div className="relative">
+    <section className="overflow-hidden rounded-3xl border bg-card p-6 shadow-sm sm:p-8">
+      <div>
         <p className="text-sm font-medium text-muted-foreground">Current balance</p>
 
         <div className="mt-2 flex items-end gap-3">

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ArrowUp, Loader2, SlidersHorizontal, Sparkles } from "lucide-react"
+import { ArrowUp, Loader2, SlidersHorizontal, MessageSquare } from "lucide-react"
 import type { Category } from "@web/types"
 import type { TransactionType } from "@/shared/types"
 import { Button } from "@web/components/ui/button"
@@ -37,7 +37,7 @@ const CommandBar = ({ categories, currency, onCreate, onAddFromText }: Props) =>
     <>
       <div className="rounded-2xl border bg-card p-2 shadow-sm focus-within:ring-2 focus-within:ring-ring/40">
         <div className="flex items-center gap-2">
-          <Sparkles className="ml-2 size-4 shrink-0 text-primary" />
+          <MessageSquare className="ml-2 size-4 shrink-0 text-primary" />
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}

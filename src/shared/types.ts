@@ -96,6 +96,13 @@ export const cycleCloseInputSchema = z.object({
   id: z.number()
 })
 
+export const cycleUpdateInputSchema = z.object({
+  id: z.number(),
+  gross: z.number().positive().optional(),
+  sweepPct: z.number().min(0).max(100).optional(),
+  allocations: z.array(cycleAllocationSchema).optional()
+})
+
 export const cycleReviewInputSchema = z.object({
   id: z.number().optional()
 })
