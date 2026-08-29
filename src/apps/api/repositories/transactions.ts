@@ -1,7 +1,7 @@
 import type { AppDb } from "@/db/client"
 
 import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm"
-import { transactions } from "@/db/schema"
+import { transactions, categories } from "@/db/schema"
 import type { NewLedgerTransaction } from "@/shared/types"
 
 export type TransactionPatch = {
@@ -101,8 +101,43 @@ export const createTransactionsRepo = (db: AppDb) => ({
     }
   },
 
+  // Total discretionary expense in [from, to), strictly EXCLUDING 'Savings'
+  // transactions so savings deposits/transfers never penalize daily pacing allowance.
+  getDiscretionaryExpenseInRange: async (
+    accountId: string,
+    from: string,
+    to: string
+  ): Promise<number> => {
+    const excludedCategories = await db.query.categories.findMany({
+      where: and(
+        eq(categories.accountId, accountId),
+        sql`LOWER(${categories.name}) IN ('savings', 'transfer')`
+      )
+    })
+    const excludedIds = excludedCategories.map((c) => c.id)
+
+    const result = await db
+      .select({
+        expense: sql<number>`COALESCE(SUM(${transactions.amountMinor}), 0)`
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.accountId, accountId),
+          eq(transactions.type, "Expense"),
+          gte(transactions.occurredAt, from),
+          lt(transactions.occurredAt, to),
+          excludedIds.length > 0
+            ? sql`(${transactions.categoryId} IS NULL OR ${transactions.categoryId} NOT IN (${sql.raw(excludedIds.join(","))}))`
+            : undefined
+        )
+      )
+      .get()
+
+    return result?.expense ?? 0
+  },
+
   // Total expense in [from, to) for a single category (null = all categories).
-  // Used for Pacer's daily/cycle spend totals (lib/pacer.ts, cron/pacerTick.ts).
   getCategoryExpenseInRange: async (
     accountId: string,
     categoryId: number | null,

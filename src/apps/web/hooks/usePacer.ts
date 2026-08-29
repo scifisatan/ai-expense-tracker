@@ -77,10 +77,20 @@ export function usePacer() {
     }
   }
 
-  const depositSavings = async (input: { amount: number; note?: string }) => {
+  const depositSavings = async (input: {
+    amount: number
+    source?: "balance_to_savings" | "savings_to_balance" | "direct_deposit"
+    note?: string
+  }) => {
     try {
       await depositMutation.mutateAsync(input)
-      flash("success", "Deposited to Savings Vault ✓")
+      const label =
+        input.source === "savings_to_balance"
+          ? "Withdrawn to Main Balance ✓"
+          : input.source === "balance_to_savings"
+            ? "Transferred to Savings Vault ✓"
+            : "Deposited to Savings Vault ✓"
+      flash("success", label)
       await Promise.all([
         refetch(),
         refetchLastCompleted(),
@@ -90,7 +100,7 @@ export function usePacer() {
       ])
       return true
     } catch {
-      flash("error", "Failed to deposit into Savings.", 3000)
+      flash("error", "Failed to complete transfer.", 3000)
       return false
     }
   }

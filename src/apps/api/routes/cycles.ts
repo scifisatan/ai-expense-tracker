@@ -12,6 +12,7 @@ import { startOfLocalDay, addDays, localDateString, parseDbTimestamp, toDbTimest
 import { daysToAfford, poolMinor } from "@/shared/allowance"
 import { computeCycleSnapshot } from "../lib/pacer"
 import { publishBalance } from "@api/lib/ledger"
+import { fundLedger } from "@/db/schema"
 import { log } from "@/utils/logger"
 
 export const cyclesRouter = t.router({
@@ -240,6 +241,9 @@ export const cyclesRouter = t.router({
     .input(
       z.object({
         amount: z.number().positive(),
+        source: z
+          .enum(["balance_to_savings", "savings_to_balance", "direct_deposit"])
+          .default("balance_to_savings"),
         note: z.string().optional()
       })
     )
@@ -248,40 +252,80 @@ export const cyclesRouter = t.router({
       const timezone = account?.timezone ?? "UTC"
       const currency = account?.defaultCurrency ?? "USD"
       const amountMinor = toMinor(input.amount, currency)
-      const nowTs = toDbTimestamp(new Date())
-
-      const activeCycle = await ctx.repos.cycles.findOpenForDate(ctx.accountId, nowTs)
-      if (activeCycle) {
-        await ctx.repos.cycles.addAllocations(activeCycle.id, [
-          {
-            kind: "savings",
-            label: input.note?.trim() || "Savings Vault Deposit",
-            amountMinor
-          }
-        ])
-      }
+      const transferNote =
+        input.note?.trim() ||
+        (input.source === "savings_to_balance"
+          ? "Withdrawal to Main Balance"
+          : input.source === "balance_to_savings"
+            ? "Transfer to Savings Vault"
+            : "Savings Vault Deposit")
 
       const categories = await ctx.repos.categories.listByAccount(ctx.accountId)
-      const savingsCategory = categories.find(
-        (c) => c.name.toLowerCase() === "savings" && c.type === "Expense"
-      )
+      let transferCategory = categories.find((c) => c.name.toLowerCase() === "transfer")
+      if (!transferCategory) {
+        const [created] = await ctx.repos.categories.create(ctx.accountId, {
+          name: "Transfer",
+          type: input.source === "savings_to_balance" ? "Income" : "Expense"
+        })
+        transferCategory = created
+      }
 
-      await ctx.repos.transactions.insertLedger({
-        accountId: ctx.accountId,
-        items: [
-          {
-            amountMinor,
-            type: "Expense",
-            note: input.note?.trim() || "Savings Vault Deposit",
-            currency,
-            categoryId: savingsCategory?.id ?? null,
-            categoryName: savingsCategory?.name ?? "Savings",
-            occurredAt: localDateString(timezone)
-          }
-        ],
-        source: "web",
-        fallbackNote: `Savings Deposit ${input.amount}`
-      })
+      if (input.source === "balance_to_savings") {
+        await ctx.db.insert(fundLedger).values({
+          accountId: ctx.accountId,
+          bucket: "savings_vault",
+          deltaMinor: amountMinor,
+          reason: "deposit"
+        })
+
+        await ctx.repos.transactions.insertLedger({
+          accountId: ctx.accountId,
+          items: [
+            {
+              amountMinor,
+              type: "Expense",
+              note: transferNote,
+              currency,
+              categoryId: transferCategory?.id ?? null,
+              categoryName: "Transfer",
+              occurredAt: localDateString(timezone)
+            }
+          ],
+          source: "web",
+          fallbackNote: transferNote
+        })
+      } else if (input.source === "savings_to_balance") {
+        await ctx.db.insert(fundLedger).values({
+          accountId: ctx.accountId,
+          bucket: "savings_vault",
+          deltaMinor: -amountMinor,
+          reason: "adjustment"
+        })
+
+        await ctx.repos.transactions.insertLedger({
+          accountId: ctx.accountId,
+          items: [
+            {
+              amountMinor,
+              type: "Income",
+              note: transferNote,
+              currency,
+              categoryId: transferCategory?.id ?? null,
+              categoryName: "Transfer",
+              occurredAt: localDateString(timezone)
+            }
+          ],
+          source: "web",
+          fallbackNote: transferNote
+        })
+      } else {
+        await ctx.db.insert(fundLedger).values({
+          accountId: ctx.accountId,
+          bucket: "savings_vault",
+          deltaMinor: amountMinor,
+          reason: "deposit"
+        })
+      }
 
       const newBalance = await ctx.repos.transactions.getNetBalance(ctx.accountId)
       ctx.waitUntil(

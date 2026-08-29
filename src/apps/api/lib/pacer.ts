@@ -42,9 +42,8 @@ export const computeCycleSnapshot = async (
     await ctx.repos.pacer.sumForCycleBefore(cycle.id, today)
 
   const todayRange = dayRange(timezone, now)
-  const spentTodayMinor = await ctx.repos.transactions.getCategoryExpenseInRange(
+  const spentTodayMinor = await ctx.repos.transactions.getDiscretionaryExpenseInRange(
     ctx.accountId,
-    null,
     todayRange.from,
     todayRange.to
   )

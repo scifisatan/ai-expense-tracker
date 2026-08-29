@@ -82,10 +82,9 @@ const closeYesterdayIfDue = async (
     await repos.pacer.sumForCycleBefore(cycle.id, yesterday)
 
   // Half-open [yesterday's midnight, today's midnight) — contiguous with day
-  // boundaries elsewhere, no Date round-trip needed.
-  const spentYesterdayMinor = await repos.transactions.getCategoryExpenseInRange(
+  // boundaries elsewhere, no Date round-trip needed. Excludes Savings.
+  const spentYesterdayMinor = await repos.transactions.getDiscretionaryExpenseInRange(
     accountId,
-    null,
     startOfLocalDay(timezone, yesterday),
     startOfLocalDay(timezone, today)
   )

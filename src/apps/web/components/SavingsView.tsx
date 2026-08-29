@@ -42,7 +42,7 @@ export const SavingsView = ({ onNavigate: _onNavigate }: Props) => {
           className="gap-1.5 rounded-2xl bg-emerald-600 font-semibold text-white hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400"
         >
           <Plus className="size-4" />
-          Deposit to Vault
+          Transfer &amp; Deposit
         </Button>
       </div>
 
@@ -58,7 +58,7 @@ export const SavingsView = ({ onNavigate: _onNavigate }: Props) => {
               {formatMoney(totalSavings, currency)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Total lifetime accumulated savings across all cycles and manual deposits.
+              Total lifetime accumulated savings across all cycles, transfers, and deposits.
             </p>
           </div>
 
@@ -69,9 +69,9 @@ export const SavingsView = ({ onNavigate: _onNavigate }: Props) => {
               className="gap-2 rounded-2xl bg-emerald-600 px-5 font-semibold text-white hover:bg-emerald-500 dark:bg-emerald-500 dark:hover:bg-emerald-400"
             >
               <Plus className="size-4" />
-              + Quick Deposit
+              Transfer / Deposit
             </Button>
-            <span className="text-[11px] text-muted-foreground">Instant deposit into protected vault</span>
+            <span className="text-[11px] text-muted-foreground">Move from balance or add external savings</span>
           </div>
         </div>
       </div>

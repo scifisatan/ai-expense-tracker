@@ -12,7 +12,7 @@ export type NewDayCloseInput = {
   sweptMinor: number
 }
 
-export type FundBucket = "want_fund" | "needs_reserve"
+export type FundBucket = "want_fund" | "needs_reserve" | "savings_vault"
 
 export const createPacerRepo = (db: AppDb) => ({
   findDayClose: (accountId: string, localDate: string) =>

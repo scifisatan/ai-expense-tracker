@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { PiggyBank, Plus } from "lucide-react"
+import { PiggyBank, ArrowRightLeft, ArrowUpRight, ArrowDownLeft, ShieldCheck } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -11,17 +11,25 @@ import {
 import { Button } from "@web/components/ui/button"
 import { Input } from "@web/components/ui/input"
 import { Label } from "@web/components/ui/label"
+import { cn } from "@web/lib/utils"
+
+export type TransferSource = "balance_to_savings" | "savings_to_balance" | "direct_deposit"
 
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
   currency: string
-  onDeposit: (input: { amount: number; note?: string }) => Promise<boolean>
+  onDeposit: (input: {
+    amount: number
+    source?: TransferSource
+    note?: string
+  }) => Promise<boolean>
 }
 
 const QUICK_AMOUNTS = [500, 1000, 5000, 10000]
 
 export const DepositSavingsDialog = ({ open, onOpenChange, currency, onDeposit }: Props) => {
+  const [source, setSource] = useState<TransferSource>("balance_to_savings")
   const [amount, setAmount] = useState("")
   const [note, setNote] = useState("")
   const [loading, setLoading] = useState(false)
@@ -41,6 +49,7 @@ export const DepositSavingsDialog = ({ open, onOpenChange, currency, onDeposit }
     try {
       const ok = await onDeposit({
         amount: numAmount,
+        source,
         note: note.trim() || undefined
       })
       if (ok) {
@@ -60,20 +69,79 @@ export const DepositSavingsDialog = ({ open, onOpenChange, currency, onDeposit }
           <DialogHeader>
             <div className="flex items-center gap-2.5">
               <div className="flex size-9 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                <PiggyBank className="size-5" />
+                {source === "savings_to_balance" ? (
+                  <ArrowDownLeft className="size-5" />
+                ) : source === "balance_to_savings" ? (
+                  <ArrowUpRight className="size-5" />
+                ) : (
+                  <PiggyBank className="size-5" />
+                )}
               </div>
               <div>
-                <DialogTitle>Deposit to Savings Vault</DialogTitle>
+                <DialogTitle>
+                  {source === "savings_to_balance"
+                    ? "Withdraw to Main Balance"
+                    : source === "balance_to_savings"
+                      ? "Transfer from Main Balance"
+                      : "Direct Deposit to Vault"}
+                </DialogTitle>
                 <DialogDescription>
-                  Lock away funds into your accumulated savings vault.
+                  {source === "balance_to_savings"
+                    ? "Transfer cash from your available balance into the protected vault."
+                    : source === "savings_to_balance"
+                      ? "Withdraw savings back into your active spending balance."
+                      : "Add external funds or existing savings without touching main balance."}
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
 
-          <div className="space-y-3 py-2">
+          {/* Transfer Mode Selector Tabs */}
+          <div className="grid grid-cols-3 gap-1 rounded-2xl bg-muted/50 p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setSource("balance_to_savings")}
+              className={cn(
+                "flex flex-col items-center gap-1 rounded-xl py-2 px-1 text-center font-semibold transition-all",
+                source === "balance_to_savings"
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <ArrowUpRight className="size-3.5 text-emerald-500" />
+              <span>From Balance</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSource("direct_deposit")}
+              className={cn(
+                "flex flex-col items-center gap-1 rounded-xl py-2 px-1 text-center font-semibold transition-all",
+                source === "direct_deposit"
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <ShieldCheck className="size-3.5 text-blue-500" />
+              <span>Direct / External</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSource("savings_to_balance")}
+              className={cn(
+                "flex flex-col items-center gap-1 rounded-xl py-2 px-1 text-center font-semibold transition-all",
+                source === "savings_to_balance"
+                  ? "bg-background text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <ArrowDownLeft className="size-3.5 text-purple-500" />
+              <span>To Balance</span>
+            </button>
+          </div>
+
+          <div className="space-y-3 py-1">
             <div className="space-y-1.5">
-              <Label htmlFor="deposit-amount">Deposit Amount ({currency})</Label>
+              <Label htmlFor="deposit-amount">Amount ({currency})</Label>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">
                   {currency}
@@ -107,10 +175,16 @@ export const DepositSavingsDialog = ({ open, onOpenChange, currency, onDeposit }
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="deposit-note">Note / Purpose (optional)</Label>
+              <Label htmlFor="deposit-note">Note / Description (optional)</Label>
               <Input
                 id="deposit-note"
-                placeholder="e.g. Monthly top-up, Freelance profit, Bonus"
+                placeholder={
+                  source === "savings_to_balance"
+                    ? "e.g. Vacation expense, Emergency withdrawal"
+                    : source === "balance_to_savings"
+                      ? "e.g. Monthly surplus, Salary savings"
+                      : "e.g. Existing savings balance, Bank deposit"
+                }
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 className="text-sm"
@@ -118,7 +192,7 @@ export const DepositSavingsDialog = ({ open, onOpenChange, currency, onDeposit }
             </div>
           </div>
 
-          <DialogFooter className="gap-3 sm:gap-3 pt-2">
+          <DialogFooter className="gap-2 sm:gap-2 pt-2">
             <Button
               type="button"
               variant="outline"
@@ -127,9 +201,24 @@ export const DepositSavingsDialog = ({ open, onOpenChange, currency, onDeposit }
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={!isValid || loading} className="gap-1.5">
-              <Plus className="size-4" />
-              {loading ? "Depositing…" : "Deposit Funds"}
+            <Button
+              type="submit"
+              disabled={!isValid || loading}
+              className={cn(
+                "gap-1.5 font-semibold text-white",
+                source === "savings_to_balance"
+                  ? "bg-purple-600 hover:bg-purple-500"
+                  : "bg-emerald-600 hover:bg-emerald-500"
+              )}
+            >
+              <ArrowRightLeft className="size-4" />
+              {loading
+                ? "Processing…"
+                : source === "savings_to_balance"
+                  ? "Withdraw Funds"
+                  : source === "balance_to_savings"
+                    ? "Transfer from Balance"
+                    : "Deposit to Vault"}
             </Button>
           </DialogFooter>
         </form>

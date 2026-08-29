@@ -1,6 +1,6 @@
 import type { AppDb } from "@/db/client"
 import { and, asc, desc, eq, gt, isNotNull, isNull, lte, or, sql } from "drizzle-orm"
-import { cycles, allocations } from "@/db/schema"
+import { cycles, allocations, categories, transactions, fundLedger } from "@/db/schema"
 import type { AllocationKind } from "@/db/schema"
 
 export type NewCycleInput = {
@@ -117,13 +117,41 @@ export const createCyclesRepo = (db: AppDb) => ({
       .where(and(eq(cycles.id, id), eq(cycles.accountId, accountId))),
 
   getAccumulatedSavings: async (accountId: string): Promise<number> => {
-    const result = await db
+    // 1. Sum from cycle allocations of kind "savings"
+    const allocResult = await db
       .select({ totalMinor: sql<number>`COALESCE(SUM(${allocations.amountMinor}), 0)` })
       .from(allocations)
       .innerJoin(cycles, eq(allocations.cycleId, cycles.id))
       .where(and(eq(cycles.accountId, accountId), eq(allocations.kind, "savings")))
       .get()
-    return result?.totalMinor ?? 0
+
+    // 2. Sum from direct savings vault deposits in fundLedger
+    const vaultResult = await db
+      .select({ totalMinor: sql<number>`COALESCE(SUM(${fundLedger.deltaMinor}), 0)` })
+      .from(fundLedger)
+      .where(and(eq(fundLedger.accountId, accountId), eq(fundLedger.bucket, "savings_vault")))
+      .get()
+
+    // 3. Sum from manual Savings transactions (if any)
+    const savingsCategory = await db.query.categories.findFirst({
+      where: and(eq(categories.accountId, accountId), sql`LOWER(${categories.name}) = 'savings'`)
+    })
+
+    const txResult = savingsCategory
+      ? await db
+          .select({ totalMinor: sql<number>`COALESCE(SUM(${transactions.amountMinor}), 0)` })
+          .from(transactions)
+          .where(
+            and(
+              eq(transactions.accountId, accountId),
+              eq(transactions.type, "Expense"),
+              eq(transactions.categoryId, savingsCategory.id)
+            )
+          )
+          .get()
+      : { totalMinor: 0 }
+
+    return (allocResult?.totalMinor ?? 0) + (vaultResult?.totalMinor ?? 0) + (txResult?.totalMinor ?? 0)
   },
 
   // Distinct accountIds with a still-open cycle, keyset-paginated for cron

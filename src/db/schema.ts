@@ -165,9 +165,9 @@ export const queueItems = sqliteTable('queue_items', {
 export const fundLedger = sqliteTable('fund_ledger', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   accountId: text('account_id').notNull().references(() => accounts.id),
-  bucket: text('bucket').$type<"want_fund" | "needs_reserve">().notNull(),
+  bucket: text('bucket').$type<"want_fund" | "needs_reserve" | "savings_vault">().notNull(),
   deltaMinor: integer('delta_minor').notNull(), // + sweep/credit, - purchase
-  reason: text('reason').$type<"sweep" | "purchase" | "reserve_credit" | "adjustment">().notNull(),
+  reason: text('reason').$type<"sweep" | "purchase" | "reserve_credit" | "adjustment" | "deposit">().notNull(),
   dayCloseLocalDate: text('day_close_local_date'), // set for sweep/reserve_credit
   queueItemId: integer('queue_item_id').references(() => queueItems.id), // set for purchase
   createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
