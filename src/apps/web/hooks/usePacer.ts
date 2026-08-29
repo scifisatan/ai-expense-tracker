@@ -3,7 +3,9 @@ import { trpc } from "@web/trpc"
 import type { AllocationKind } from "@/shared/types"
 
 export function usePacer() {
+  const utils = trpc.useUtils()
   const { data: snapshot, isLoading, refetch } = trpc.cycles.current.useQuery()
+  const { data: lastCompleted, refetch: refetchLastCompleted } = trpc.cycles.lastCompleted.useQuery()
   const createMutation = trpc.cycles.create.useMutation()
   const closeMutation = trpc.cycles.close.useMutation()
 
@@ -24,7 +26,7 @@ export function usePacer() {
     try {
       await createMutation.mutateAsync(input)
       flash("success", "Cycle started ✓")
-      await refetch()
+      await Promise.all([refetch(), refetchLastCompleted(), utils.cycles.review.invalidate()])
       return true
     } catch {
       flash("error", "Failed to start the cycle.", 3000)
@@ -36,17 +38,21 @@ export function usePacer() {
     try {
       await closeMutation.mutateAsync({ id })
       flash("success", "Cycle closed ✓")
-      await refetch()
+      await Promise.all([refetch(), refetchLastCompleted(), utils.cycles.review.invalidate()])
+      return true
     } catch {
       flash("error", "Failed to close the cycle.", 3000)
+      return false
     }
   }
 
   return {
     snapshot,
+    lastCompleted,
     isLoading,
     status,
     startCycle,
-    closeCycle
+    closeCycle,
+    refetch
   }
 }

@@ -4,6 +4,7 @@ import {
   allowanceForDay,
   sweepMinor,
   daysToAfford,
+  calculateQueueAffordability,
   midRank,
   needsRenormalize
 } from "./allowance"
@@ -94,6 +95,27 @@ describe("daysToAfford", () => {
     expect(
       daysToAfford({ priceMinor: 1000, currentBalanceMinor: 0, projectedDailySweepMinor: 0 })
     ).toBeNull()
+  })
+})
+
+describe("calculateQueueAffordability", () => {
+  it("computes cumulative daysToAfford across an ordered list of items", () => {
+    const items = [
+      { id: 1, priceMinor: 1000 },
+      { id: 2, priceMinor: 600 },
+      { id: 3, priceMinor: 400 }
+    ]
+    // Balance 1000, sweep 200/day
+    // Item 1: cum 1000, balance 1000 -> 0 days
+    // Item 2: cum 1600, rem 600 / 200 -> 3 days
+    // Item 3: cum 2000, rem 1000 / 200 -> 5 days
+    const result = calculateQueueAffordability(items, 1000, 200)
+    expect(result.get(1)?.daysToAfford).toBe(0)
+    expect(result.get(1)?.cumulativePriceMinor).toBe(1000)
+    expect(result.get(2)?.daysToAfford).toBe(3)
+    expect(result.get(2)?.cumulativePriceMinor).toBe(1600)
+    expect(result.get(3)?.daysToAfford).toBe(5)
+    expect(result.get(3)?.cumulativePriceMinor).toBe(2000)
   })
 })
 

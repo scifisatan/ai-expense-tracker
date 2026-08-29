@@ -24,6 +24,8 @@ describe("money helpers", () => {
 
   it("formats with a currency symbol", () => {
     expect(formatMoney(1250, "USD")).toBe("$12.50")
+    const npr = formatMoney(125000, "NPR")
+    expect(npr).toMatch(/(NPR|Rs\.?)\s*1,250/)
   })
 
   it("falls back gracefully for unknown currency codes", () => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Plus, Trash2 } from "lucide-react"
+import { Plus, Trash2, Home, Heart, PiggyBank, ShieldCheck, Tv, Zap, MoreHorizontal } from "lucide-react"
 import type { AllocationKind } from "@/shared/types"
 import {
   Dialog,
@@ -20,11 +20,41 @@ import {
   SelectValue
 } from "@web/components/ui/select"
 
-type AllocationDraft = { kind: AllocationKind; label: string; amount: string }
+export type AllocationPreset = {
+  id: string
+  kind: AllocationKind
+  label: string
+  icon: typeof Home
+}
+
+export const PRESET_ALLOCATIONS: AllocationPreset[] = [
+  { id: "rent", kind: "fixed", label: "Rent / Housing", icon: Home },
+  { id: "family", kind: "family", label: "Family Support", icon: Heart },
+  { id: "savings", kind: "savings", label: "Savings", icon: PiggyBank },
+  { id: "needs_reserve", kind: "needs_reserve", label: "Needs Reserve", icon: ShieldCheck },
+  { id: "subscriptions", kind: "subscriptions", label: "Subscriptions", icon: Tv },
+  { id: "utilities", kind: "fixed", label: "Utilities & Bills", icon: Zap },
+  { id: "custom", kind: "other", label: "Custom", icon: MoreHorizontal }
+]
+
+export type AllocationDraft = {
+  presetId: string
+  kind: AllocationKind
+  label: string
+  amount: string
+  isCustom: boolean
+}
 
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialValues?: {
+    startDate?: string
+    endDate?: string
+    gross?: number
+    sweepPct?: number
+    allocations?: { kind: AllocationKind; label: string; amount: number }[]
+  } | null
   onStart: (input: {
     startDate: string
     endDate: string
@@ -34,22 +64,20 @@ type Props = {
   }) => Promise<boolean>
 }
 
-const ALLOCATION_KINDS: { value: AllocationKind; label: string }[] = [
-  { value: "family", label: "Family" },
-  { value: "savings", label: "Savings" },
-  { value: "subscriptions", label: "Subscriptions" },
-  { value: "fixed", label: "Fixed bill" },
-  { value: "needs_reserve", label: "Needs reserve" },
-  { value: "other", label: "Other" }
-]
-
 const todayIso = () => new Date().toLocaleDateString("en-CA")
 
-const emptyAllocation = (): AllocationDraft => ({ kind: "other", label: "", amount: "" })
+const defaultAllocation = (presetId = "rent"): AllocationDraft => {
+  const preset = PRESET_ALLOCATIONS.find((p) => p.id === presetId) ?? PRESET_ALLOCATIONS[0]!
+  return {
+    presetId: preset.id,
+    kind: preset.kind,
+    label: preset.label,
+    amount: "",
+    isCustom: preset.id === "custom"
+  }
+}
 
-// One income period: gross + off-the-top allocations + sweep percentage. This
-// is the only place a cycle gets created — from TodayCard's empty state.
-const StartCycleDialog = ({ open, onOpenChange, onStart }: Props) => {
+const StartCycleDialog = ({ open, onOpenChange, initialValues, onStart }: Props) => {
   const [startDate, setStartDate] = useState(todayIso())
   const [endDate, setEndDate] = useState("")
   const [gross, setGross] = useState("")
@@ -59,24 +87,76 @@ const StartCycleDialog = ({ open, onOpenChange, onStart }: Props) => {
 
   useEffect(() => {
     if (!open) return
-    setStartDate(todayIso())
-    setEndDate("")
-    setGross("")
-    setSweepPct("50")
-    setAllocations([])
-  }, [open])
+
+    if (initialValues) {
+      setStartDate(initialValues.startDate ?? todayIso())
+      setEndDate(initialValues.endDate ?? "")
+      setGross(initialValues.gross ? String(initialValues.gross) : "")
+      setSweepPct(initialValues.sweepPct !== undefined ? String(initialValues.sweepPct) : "50")
+      if (initialValues.allocations && initialValues.allocations.length > 0) {
+        setAllocations(
+          initialValues.allocations.map((a) => {
+            const matched = PRESET_ALLOCATIONS.find(
+              (p) => p.label.toLowerCase() === a.label.toLowerCase() || p.kind === a.kind
+            )
+            return {
+              presetId: matched ? matched.id : "custom",
+              kind: a.kind,
+              label: a.label,
+              amount: String(a.amount),
+              isCustom: !matched || matched.id === "custom"
+            }
+          })
+        )
+      } else {
+        setAllocations([])
+      }
+    } else {
+      setStartDate(todayIso())
+      setEndDate("")
+      setGross("")
+      setSweepPct("50")
+      setAllocations([])
+    }
+  }, [open, initialValues])
 
   const grossValue = Number(gross)
   const grossValid = Boolean(gross) && Number.isFinite(grossValue) && grossValue > 0
   const datesValid = Boolean(startDate) && Boolean(endDate) && endDate >= startDate
   const canSubmit = grossValid && datesValid && !saving
 
-  const updateAllocation = (index: number, patch: Partial<AllocationDraft>) => {
-    setAllocations((prev) => prev.map((a, i) => (i === index ? { ...a, ...patch } : a)))
+  const handlePresetChange = (index: number, presetId: string) => {
+    const preset = PRESET_ALLOCATIONS.find((p) => p.id === presetId)
+    if (!preset) return
+
+    setAllocations((prev) =>
+      prev.map((a, i) => {
+        if (i !== index) return a
+        return {
+          ...a,
+          presetId,
+          kind: preset.kind,
+          label: preset.id === "custom" ? (a.isCustom ? a.label : "") : preset.label,
+          isCustom: preset.id === "custom"
+        }
+      })
+    )
+  }
+
+  const updateAllocationAmount = (index: number, amount: string) => {
+    setAllocations((prev) => prev.map((a, i) => (i === index ? { ...a, amount } : a)))
+  }
+
+  const updateCustomLabel = (index: number, label: string) => {
+    setAllocations((prev) => prev.map((a, i) => (i === index ? { ...a, label } : a)))
   }
 
   const removeAllocation = (index: number) => {
     setAllocations((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const addAllocation = () => {
+    setAllocations((prev) => [...prev, defaultAllocation()])
   }
 
   const submit = async (e: React.FormEvent) => {
@@ -91,7 +171,11 @@ const StartCycleDialog = ({ open, onOpenChange, onStart }: Props) => {
       sweepPct: Number(sweepPct) || 0,
       allocations: allocations
         .filter((a) => a.label.trim() && Number(a.amount) > 0)
-        .map((a) => ({ kind: a.kind, label: a.label.trim(), amount: Number(a.amount) }))
+        .map((a) => ({
+          kind: a.kind,
+          label: a.label.trim(),
+          amount: Number(a.amount)
+        }))
     })
     setSaving(false)
     if (ok) onOpenChange(false)
@@ -103,8 +187,7 @@ const StartCycleDialog = ({ open, onOpenChange, onStart }: Props) => {
         <DialogHeader>
           <DialogTitle>Start a pacing cycle</DialogTitle>
           <DialogDescription>
-            Set your income and what's spoken for. Everything left gets split evenly across the
-            days you pick.
+            Set your income and off-the-top allocations. Everything remaining is split evenly across your days.
           </DialogDescription>
         </DialogHeader>
 
@@ -132,11 +215,11 @@ const StartCycleDialog = ({ open, onOpenChange, onStart }: Props) => {
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="cycle-gross">Income</Label>
+            <Label htmlFor="cycle-gross">Income Amount</Label>
             <Input
               id="cycle-gross"
               inputMode="decimal"
-              placeholder="0.00"
+              placeholder="e.g. 50000"
               value={gross}
               onChange={(e) => setGross(e.target.value)}
               autoFocus
@@ -144,71 +227,92 @@ const StartCycleDialog = ({ open, onOpenChange, onStart }: Props) => {
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="cycle-sweep">Sweep leftover into Want Fund (%)</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="cycle-sweep">Sweep into Want Fund</Label>
+              <span className="text-xs font-semibold text-muted-foreground">{sweepPct}%</span>
+            </div>
             <Input
               id="cycle-sweep"
-              type="number"
+              type="range"
               min={0}
               max={100}
+              step={10}
               value={sweepPct}
               onChange={(e) => setSweepPct(e.target.value)}
+              className="cursor-pointer"
             />
           </div>
 
-          <div className="grid gap-2">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Off-the-top allocations</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setAllocations((prev) => [...prev, emptyAllocation()])}
-              >
-                <Plus className="size-3.5" /> Add
+              <Button type="button" variant="outline" size="sm" onClick={addAllocation} className="h-7 text-xs">
+                <Plus className="mr-1 size-3.5" /> Add
               </Button>
             </div>
 
-            {allocations.map((allocation, index) => (
-              <div key={index} className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2">
-                <Select
-                  value={allocation.kind}
-                  onValueChange={(value) => updateAllocation(index, { kind: value as AllocationKind })}
-                >
-                  <SelectTrigger className="w-36">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ALLOCATION_KINDS.map((k) => (
-                      <SelectItem key={k.value} value={k.value}>
-                        {k.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  placeholder="Rent"
-                  value={allocation.label}
-                  onChange={(e) => updateAllocation(index, { label: e.target.value })}
-                />
-                <Input
-                  className="w-24"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  value={allocation.amount}
-                  onChange={(e) => updateAllocation(index, { amount: e.target.value })}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground"
-                  onClick={() => removeAllocation(index)}
-                  aria-label="Remove allocation"
-                >
-                  <Trash2 className="size-4" />
-                </Button>
+            {allocations.length === 0 ? (
+              <p className="rounded-xl border border-dashed py-3 text-center text-xs text-muted-foreground">
+                No fixed deductions. Click "+ Add" to budget for rent, savings, or family.
+              </p>
+            ) : (
+              <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                {allocations.map((allocation, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    {allocation.isCustom ? (
+                      <Input
+                        placeholder="e.g. Loan Payment"
+                        value={allocation.label}
+                        onChange={(e) => updateCustomLabel(index, e.target.value)}
+                        className="h-9 flex-1 text-sm"
+                        autoFocus
+                      />
+                    ) : (
+                      <Select
+                        value={allocation.presetId}
+                        onValueChange={(val) => handlePresetChange(index, val)}
+                      >
+                        <SelectTrigger className="h-9 flex-1 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PRESET_ALLOCATIONS.map((preset) => {
+                            const Icon = preset.icon
+                            return (
+                              <SelectItem key={preset.id} value={preset.id}>
+                                <div className="flex items-center gap-2">
+                                  <Icon className="size-3.5 text-muted-foreground" />
+                                  <span>{preset.label}</span>
+                                </div>
+                              </SelectItem>
+                            )
+                          })}
+                        </SelectContent>
+                      </Select>
+                    )}
+
+                    <Input
+                      className="h-9 w-24 text-sm"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={allocation.amount}
+                      onChange={(e) => updateAllocationAmount(index, e.target.value)}
+                    />
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-9 shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => removeAllocation(index)}
+                      aria-label="Remove allocation"
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
 
           <DialogFooter>

@@ -1,6 +1,5 @@
 import type { AppDb } from "@/db/client"
-
-import { and, asc, desc, eq, gt, isNull, lte } from "drizzle-orm"
+import { and, asc, desc, eq, gt, isNotNull, isNull, lte, or } from "drizzle-orm"
 import { cycles, allocations } from "@/db/schema"
 import type { AllocationKind } from "@/db/schema"
 
@@ -30,6 +29,15 @@ export const createCyclesRepo = (db: AppDb) => ({
         lte(cycles.startAt, dbTs),
         gt(cycles.endAt, dbTs)
       )
+    }),
+
+  findLastCompleted: (accountId: string, dbTs: string) =>
+    db.query.cycles.findFirst({
+      where: and(
+        eq(cycles.accountId, accountId),
+        or(isNotNull(cycles.closedAt), lte(cycles.endAt, dbTs))
+      ),
+      orderBy: [desc(cycles.endAt)]
     }),
 
   findById: (accountId: string, id: number) =>

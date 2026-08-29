@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { trpc } from "@web/trpc"
-import type { QueueKind } from "@web/types"
+import type { QueueKind, QueueItem } from "@web/types"
 
 export function useQueue(kind: QueueKind) {
   const utils = trpc.useUtils()
@@ -18,6 +18,8 @@ export function useQueue(kind: QueueKind) {
   }
 
   const items = data?.items ?? []
+  const currentBalanceMinor = data?.currentBalanceMinor ?? 0
+  const projectedDailySweepMinor = data?.projectedDailySweepMinor ?? 0
 
   // cycles.current's nearestQueueItem (and, after a purchase, its fund
   // balances) derive from this same queue — refresh both together or
@@ -48,6 +50,13 @@ export function useQueue(kind: QueueKind) {
     } catch {
       flash("error", "Failed to reorder.", 3000)
     }
+  }
+
+  const reorderList = async (reorderedItems: QueueItem[], movedItemId: number) => {
+    const movedIndex = reorderedItems.findIndex((item) => item.id === movedItemId)
+    if (movedIndex === -1) return
+    const afterId = movedIndex > 0 ? (reorderedItems[movedIndex - 1]?.id ?? null) : null
+    await reorder(movedItemId, afterId)
   }
 
   // Reject reasons ("COOLING" / "UNDERFUNDED") arrive as the tRPC error's
@@ -83,10 +92,13 @@ export function useQueue(kind: QueueKind) {
 
   return {
     items,
+    currentBalanceMinor,
+    projectedDailySweepMinor,
     isLoading,
     status,
     addItem,
     reorder,
+    reorderList,
     purchase,
     removeItem
   }

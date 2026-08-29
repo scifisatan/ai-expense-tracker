@@ -19,21 +19,23 @@ export const fromMinor = (minor: number, currency: string): number => {
   return minor / factor
 }
 
-// Human-readable amount with currency, e.g. "$12.50". Falls back to a generic
+// Human-readable amount with currency, e.g. "$12.50" or "Rs. 1,250". Falls back to a generic
 // "<CODE> <amount>" format when Intl has no symbol for the currency.
 export const formatMoney = (minor: number, currency: string): string => {
   const fractionDigits = currencyFractionDigits(currency)
   const amount = fromMinor(minor, currency)
+  const code = currency.toUpperCase()
 
   try {
-    return new Intl.NumberFormat("en-US", {
+    const locale = code === "NPR" ? "en-NP" : "en-US"
+    return new Intl.NumberFormat(locale, {
       style: "currency",
-      currency: currency.toUpperCase(),
+      currency: code,
       minimumFractionDigits: fractionDigits,
       maximumFractionDigits: fractionDigits,
     }).format(amount)
   } catch {
-    return `${currency.toUpperCase()} ${amount.toLocaleString("en-US", {
+    return `${code} ${amount.toLocaleString("en-US", {
       minimumFractionDigits: fractionDigits,
       maximumFractionDigits: fractionDigits,
     })}`

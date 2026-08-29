@@ -10,7 +10,7 @@ import {
 } from "@/shared/types"
 import { toMinor } from "@/shared/money"
 import { localDateString, addDays } from "@/shared/datetime"
-import { midRank, needsRenormalize, daysToAfford } from "@/shared/allowance"
+import { midRank, needsRenormalize, calculateQueueAffordability } from "@/shared/allowance"
 import { computeCycleSnapshot } from "../lib/pacer"
 import type { FundBucket } from "../repositories/pacer"
 
@@ -38,15 +38,23 @@ export const queueRouter = t.router({
     const projectedDailySweepMinor =
       snapshot.active && input.kind === "want" ? snapshot.projectedDailySweepMinor : 0
 
+    const affordabilityMap = calculateQueueAffordability(
+      items,
+      currentBalanceMinor,
+      projectedDailySweepMinor
+    )
+
     return {
-      items: items.map((item) => ({
-        ...item,
-        daysToAfford: daysToAfford({
-          priceMinor: item.priceMinor,
-          currentBalanceMinor,
-          projectedDailySweepMinor
-        })
-      }))
+      currentBalanceMinor,
+      projectedDailySweepMinor,
+      items: items.map((item) => {
+        const aff = affordabilityMap.get(item.id)
+        return {
+          ...item,
+          daysToAfford: aff?.daysToAfford ?? null,
+          cumulativePriceMinor: aff?.cumulativePriceMinor ?? item.priceMinor
+        }
+      })
     }
   }),
 

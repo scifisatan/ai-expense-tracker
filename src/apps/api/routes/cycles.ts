@@ -1,9 +1,9 @@
 import { TRPCError } from "@trpc/server"
 import { t, protectedProcedure } from "../trpc"
-import { cycleCreateInputSchema, cycleCloseInputSchema } from "@/shared/types"
+import { cycleCreateInputSchema, cycleCloseInputSchema, cycleReviewInputSchema } from "@/shared/types"
 import { toMinor } from "@/shared/money"
-import { startOfLocalDay, addDays } from "@/shared/datetime"
-import { daysToAfford } from "@/shared/allowance"
+import { startOfLocalDay, addDays, localDateString, parseDbTimestamp, toDbTimestamp, daysBetweenLocalDates } from "@/shared/datetime"
+import { daysToAfford, poolMinor } from "@/shared/allowance"
 import { computeCycleSnapshot } from "../lib/pacer"
 
 export const cyclesRouter = t.router({
@@ -49,6 +49,73 @@ export const cyclesRouter = t.router({
       wantFundMinor: snapshot.wantFundMinor,
       needsReserveMinor: snapshot.needsReserveMinor,
       nearestQueueItem
+    }
+  }),
+
+  lastCompleted: protectedProcedure.query(async ({ ctx }) => {
+    const nowTs = toDbTimestamp(new Date())
+    const cycle = await ctx.repos.cycles.findLastCompleted(ctx.accountId, nowTs)
+    if (!cycle) return null
+
+    const allocations = await ctx.repos.cycles.listAllocations(cycle.id)
+    return {
+      cycle,
+      allocations,
+      currency: cycle.currency
+    }
+  }),
+
+  review: protectedProcedure.input(cycleReviewInputSchema.optional()).query(async ({ input, ctx }) => {
+    const account = await ctx.repos.accounts.findById(ctx.accountId)
+    const timezone = account?.timezone ?? "UTC"
+    const nowTs = toDbTimestamp(new Date())
+
+    const cycle = input?.id
+      ? await ctx.repos.cycles.findById(ctx.accountId, input.id)
+      : await ctx.repos.cycles.findLastCompleted(ctx.accountId, nowTs)
+
+    if (!cycle) return null
+
+    const allocations = await ctx.repos.cycles.listAllocations(cycle.id)
+    const pool = poolMinor(
+      cycle.grossMinor,
+      allocations.map((a) => a.amountMinor)
+    )
+
+    // Total expenses incurred in this cycle's range [startAt, endAt)
+    const totalSpentMinor = await ctx.repos.transactions.getCategoryExpenseInRange(
+      ctx.accountId,
+      null,
+      cycle.startAt,
+      cycle.endAt
+    )
+
+    // Sum day closes for this cycle
+    const { spentMinor: _totalClosedSpent, sweptMinor: totalSweptMinor } =
+      await ctx.repos.pacer.sumForCycleBefore(cycle.id, "9999-12-31")
+
+    const wantFundBalanceMinor = await ctx.repos.pacer.balance(ctx.accountId, "want_fund")
+    const needsReserveBalanceMinor = await ctx.repos.pacer.balance(ctx.accountId, "needs_reserve")
+
+    const startLocalDate = localDateString(timezone, parseDbTimestamp(cycle.startAt))
+    const endLocalDate = addDays(timezone, localDateString(timezone, parseDbTimestamp(cycle.endAt)), -1)
+    const totalDays = Math.max(
+      1,
+      daysBetweenLocalDates(startLocalDate, localDateString(timezone, parseDbTimestamp(cycle.endAt)))
+    )
+
+    return {
+      cycle,
+      allocations,
+      currency: cycle.currency,
+      poolMinor: pool,
+      totalSpentMinor,
+      totalSweptMinor,
+      totalDays,
+      startLocalDate,
+      endLocalDate,
+      wantFundBalanceMinor,
+      needsReserveBalanceMinor
     }
   }),
 

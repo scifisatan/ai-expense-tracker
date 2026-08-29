@@ -198,5 +198,46 @@ describe("queue.reorder", () => {
 
     const list = await caller.queue.list({ kind: "need" })
     expect(list.items.map((i) => i.id)).toEqual([a.item.id, c.item.id, b.item.id])
+    expect(list.items[0]?.cumulativePriceMinor).toBe(3000)
+    expect(list.items[1]?.cumulativePriceMinor).toBe(8000) // 3000 + 5000
+    expect(list.items[2]?.cumulativePriceMinor).toBe(12000) // 8000 + 4000
+  })
+})
+
+describe("cycles.lastCompleted and cycles.review", () => {
+  it("allows reviewing a completed cycle and retrieving allocations for rollover", async () => {
+    const { caller } = await setup()
+    const today = localDateString("UTC")
+    const startDate = addDays("UTC", today, -10)
+    const endDate = addDays("UTC", today, -1)
+
+    const created = await caller.cycles.create({
+      startDate,
+      endDate,
+      gross: 500,
+      sweepPct: 50,
+      allocations: [{ kind: "fixed", label: "Rent", amount: 200 }]
+    })
+
+    // Log an expense during cycle
+    await caller.transactions.create({
+      amount: 50,
+      type: "Expense",
+      occurredAt: `${startDate}T12:00:00.000Z`
+    })
+
+    // Close the cycle
+    await caller.cycles.close({ id: created.cycle.id })
+
+    const last = await caller.cycles.lastCompleted()
+    expect(last).not.toBeNull()
+    expect(last?.cycle.id).toBe(created.cycle.id)
+    expect(last?.allocations).toHaveLength(1)
+    expect(last?.allocations[0]?.label).toBe("Rent")
+
+    const review = await caller.cycles.review({ id: created.cycle.id })
+    expect(review).not.toBeNull()
+    expect(review?.poolMinor).toBe(30000)
+    expect(review?.totalSpentMinor).toBe(5000)
   })
 })

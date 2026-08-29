@@ -96,6 +96,10 @@ export const cycleCloseInputSchema = z.object({
   id: z.number()
 })
 
+export const cycleReviewInputSchema = z.object({
+  id: z.number().optional()
+})
+
 // Needs/wants queue
 export const queueKindSchema = z.enum(["need", "want"])
 

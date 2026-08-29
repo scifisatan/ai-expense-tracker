@@ -68,3 +68,26 @@ export const RANK_MIN_GAP = 1e-6
 // narrowed their gap below float precision — time to renormalize.
 export const needsRenormalize = (prevRank: number | null, nextRank: number | null): boolean =>
   prevRank !== null && nextRank !== null && nextRank - prevRank < RANK_MIN_GAP
+
+// Calculate cumulative daysToAfford for a sequentially ordered list of queue items.
+// Each item's time-to-afford includes funding all items ahead of it in the queue.
+export const calculateQueueAffordability = (
+  items: { id: number; priceMinor: number }[],
+  currentBalanceMinor: number,
+  projectedDailySweepMinor: number
+): Map<number, { daysToAfford: number | null; cumulativePriceMinor: number }> => {
+  const result = new Map<number, { daysToAfford: number | null; cumulativePriceMinor: number }>()
+  let cumulativePrice = 0
+
+  for (const item of items) {
+    cumulativePrice += item.priceMinor
+    const days = daysToAfford({
+      priceMinor: cumulativePrice,
+      currentBalanceMinor,
+      projectedDailySweepMinor
+    })
+    result.set(item.id, { daysToAfford: days, cumulativePriceMinor: cumulativePrice })
+  }
+
+  return result
+}

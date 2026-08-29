@@ -10,6 +10,7 @@ type Summary = RouterOutput["insights"]["summary"]
 type Category = RouterOutput["categories"]["list"]["items"][number]
 type TelegramLink = RouterOutput["telegram"]["listLinks"]["items"][number]
 type CycleSnapshot = RouterOutput["cycles"]["current"]
+type CycleReview = RouterOutput["cycles"]["review"]
 type QueueItem = RouterOutput["queue"]["list"]["items"][number]
 type QueueKind = "need" | "want"
 
@@ -35,6 +36,7 @@ export type {
   SortKey,
   SortDir,
   CycleSnapshot,
+  CycleReview,
   QueueItem,
   QueueKind
 }
