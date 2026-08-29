@@ -3,7 +3,9 @@ import { toast } from "sonner"
 import {
   Compass,
   History,
-  ListTodo,
+  LayoutDashboard,
+  Gift,
+  PiggyBank,
   LogOut,
   Settings as SettingsIcon,
   Wallet,
@@ -20,6 +22,8 @@ import ActivityItem from "./ActivityItem"
 import SettingsPanel from "./SettingsPanel"
 import ThemeToggle from "./ThemeToggle"
 import { QueueView } from "./QueueView"
+import { PacerView } from "./PacerView"
+import { SavingsView } from "./SavingsView"
 import { Button } from "@web/components/ui/button"
 import { cn } from "@web/lib/utils"
 import {
@@ -31,7 +35,7 @@ import {
   DropdownMenuTrigger
 } from "@web/components/ui/dropdown-menu"
 
-type View = "dashboard" | "transactions" | "wishlist" | "settings"
+type View = "dashboard" | "pacer" | "savings" | "wishlist" | "transactions" | "settings"
 
 const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => void }) => {
   const {
@@ -58,22 +62,38 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
   }, [status])
 
   const todayDeltaMinor = useMemo(() => {
-    const today = new Date().toDateString()
-    return transactions.reduce((acc, t) => {
-      if (new Date(t.occurredAt).toDateString() !== today) return acc
-      return acc + (t.type === "Income" ? t.amountMinor : -t.amountMinor)
-    }, 0)
+    const todayStr = new Date().toLocaleDateString("en-CA")
+    return transactions
+      .filter((t) => (t.occurredAt ?? "").startsWith(todayStr))
+      .reduce((sum, t) => sum + (t.type === "Income" ? t.amountMinor : -t.amountMinor), 0)
   }, [transactions])
 
   const recentTransactions = useMemo(() => {
     return transactions.slice(0, 5)
   }, [transactions])
 
-  const NAV_ITEMS = [
-    { id: "dashboard" as View, label: "Dashboard", icon: Compass, description: "Daily pacer & command center" },
-    { id: "transactions" as View, label: "Transactions", icon: History, description: "Search & transaction history" },
-    { id: "wishlist" as View, label: "Priority Wishlist", icon: ListTodo, description: "Ranked wishlist & goal timeline" },
-    { id: "settings" as View, label: "Settings", icon: SettingsIcon, description: "Preferences & accounts" }
+  const NAV_SECTIONS = [
+    {
+      title: "Overview",
+      items: [
+        { id: "dashboard" as View, label: "Dashboard", icon: LayoutDashboard },
+        { id: "transactions" as View, label: "Transactions", icon: History }
+      ]
+    },
+    {
+      title: "Pacing & Wealth",
+      items: [
+        { id: "pacer" as View, label: "Daily Pace", icon: Compass },
+        { id: "savings" as View, label: "Savings Vault", icon: PiggyBank },
+        { id: "wishlist" as View, label: "Priority Wishlist", icon: Gift }
+      ]
+    },
+    {
+      title: "Preferences",
+      items: [
+        { id: "settings" as View, label: "Settings", icon: SettingsIcon }
+      ]
+    }
   ]
 
   const handleNavSelect = (view: View) => {
@@ -99,29 +119,38 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
             </div>
           </div>
 
-          {/* Navigation Links */}
-          <nav className="space-y-1">
-            {NAV_ITEMS.map((item) => {
-              const Icon = item.icon
-              const isActive = currentView === item.id
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleNavSelect(item.id)}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-sm font-semibold transition-all",
-                    isActive
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  <Icon className="size-4 shrink-0" />
-                  <span className="flex-1">{item.label}</span>
-                  {isActive && <ChevronRight className="size-3.5 opacity-70" />}
-                </button>
-              )
-            })}
-          </nav>
+          {/* Navigation Sections */}
+          <div className="space-y-5">
+            {NAV_SECTIONS.map((section) => (
+              <div key={section.title} className="space-y-1">
+                <span className="px-3 text-[11px] font-bold text-muted-foreground/80">
+                  {section.title}
+                </span>
+                <nav className="space-y-1">
+                  {section.items.map((item) => {
+                    const Icon = item.icon
+                    const isActive = currentView === item.id
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => handleNavSelect(item.id)}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-2xl px-3.5 py-2 text-left text-sm font-semibold transition-all",
+                          isActive
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        )}
+                      >
+                        <Icon className="size-4 shrink-0" />
+                        <span className="flex-1">{item.label}</span>
+                        {isActive && <ChevronRight className="size-3.5 opacity-70" />}
+                      </button>
+                    )
+                  })}
+                </nav>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Sidebar Footer / User Profile */}
@@ -203,28 +232,35 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
 
         {/* Mobile Slide-down Menu */}
         {mobileMenuOpen && (
-          <div className="border-b bg-card p-3 shadow-lg md:hidden">
-            <nav className="space-y-1">
-              {NAV_ITEMS.map((item) => {
-                const Icon = item.icon
-                const isActive = currentView === item.id
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleNavSelect(item.id)}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition-all",
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    )}
-                  >
-                    <Icon className="size-4" />
-                    <span>{item.label}</span>
-                  </button>
-                )
-              })}
-            </nav>
+          <div className="space-y-3 border-b bg-card p-4 shadow-lg md:hidden">
+            {NAV_SECTIONS.map((section) => (
+              <div key={section.title} className="space-y-1">
+                <span className="px-2 text-[10px] font-bold text-muted-foreground/80">
+                  {section.title}
+                </span>
+                <nav className="space-y-1">
+                  {section.items.map((item) => {
+                    const Icon = item.icon
+                    const isActive = currentView === item.id
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => handleNavSelect(item.id)}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold transition-all",
+                          isActive
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        )}
+                      >
+                        <Icon className="size-4 shrink-0" />
+                        <span className="flex-1">{item.label}</span>
+                      </button>
+                    )
+                  })}
+                </nav>
+              </div>
+            ))}
           </div>
         )}
 
@@ -300,12 +336,18 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
               </div>
             )}
 
-            {/* VIEW 2: Transactions / Full Ledger */}
+            {/* VIEW 2: Daily Spending Pace */}
+            {currentView === "pacer" && <PacerView onNavigate={setCurrentView} />}
+
+            {/* VIEW 3: Savings Vault */}
+            {currentView === "savings" && <SavingsView onNavigate={setCurrentView} />}
+
+            {/* VIEW 4: Transactions / Full Ledger */}
             {currentView === "transactions" && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-xl font-bold tracking-tight text-foreground">Transactions</h2>
+                    <h2 className="text-xl font-semibold tracking-tight text-foreground">Transactions</h2>
                     <p className="text-xs text-muted-foreground">Search and review your full ledger history</p>
                   </div>
                   <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
@@ -324,11 +366,11 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
               </div>
             )}
 
-            {/* VIEW 3: Wishlist & Queue Manager */}
+            {/* VIEW 5: Wishlist & Queue Manager */}
             {currentView === "wishlist" && (
               <div className="space-y-4">
                 <div>
-                  <h2 className="text-xl font-bold tracking-tight text-foreground">Priority Wishlist & Goals</h2>
+                  <h2 className="text-xl font-semibold tracking-tight text-foreground">Priority Wishlist & Goals</h2>
                   <p className="text-xs text-muted-foreground">
                     Rank and track desired purchases funded automatically by your daily spending pace
                   </p>
@@ -338,7 +380,7 @@ const Dashboard = ({ email, onLogout }: { email: string | null; onLogout: () => 
               </div>
             )}
 
-            {/* VIEW 4: Settings Panel */}
+            {/* VIEW 6: Settings Panel */}
             {currentView === "settings" && <SettingsPanel />}
           </div>
         </main>

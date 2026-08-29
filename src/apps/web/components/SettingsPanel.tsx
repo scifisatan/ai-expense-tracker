@@ -122,7 +122,7 @@ const SettingsPanel = () => {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-xl font-bold tracking-tight text-foreground">Settings & Preferences</h2>
+        <h2 className="text-xl font-semibold tracking-tight text-foreground">Settings & Preferences</h2>
         <p className="text-xs text-muted-foreground">Manage your defaults, integrations, and categories</p>
       </div>
 

@@ -310,7 +310,7 @@ export const EditAllocationsDialog = ({
 
           <div className="grid gap-1.5">
             <Label htmlFor="edit-sweep">Underspend sweep to Want Fund ({sweepPct}%)</Label>
-            <Input
+            <input
               id="edit-sweep"
               type="range"
               min="0"
@@ -318,6 +318,7 @@ export const EditAllocationsDialog = ({
               step="5"
               value={sweepPct}
               onChange={(e) => setSweepPct(e.target.value)}
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-muted accent-primary"
             />
           </div>
 

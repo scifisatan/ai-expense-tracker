@@ -128,7 +128,7 @@ const StartCycleDialog = ({ open, onOpenChange, initialValues, onStart }: Props)
     }
   }, [open, initialValues])
 
-  const handlePresetSelect = (index: number, presetId: string) => {
+  const handlePresetChange = (index: number, presetId: string) => {
     const preset = PRESET_ALLOCATIONS.find((p) => p.id === presetId) ?? PRESET_ALLOCATIONS[0]!
     setAllocations((prev) =>
       prev.map((a, i) => {
@@ -362,6 +362,15 @@ const StartCycleDialog = ({ open, onOpenChange, initialValues, onStart }: Props)
               </div>
             )}
           </div>
+
+          {grossValue > 0 && (
+            <div className="flex items-center justify-between rounded-2xl bg-muted/40 p-3 text-xs">
+              <span className="text-muted-foreground">Discretionary pool (to pace daily):</span>
+              <span className="tabular font-bold text-foreground">
+                {remainingPool.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

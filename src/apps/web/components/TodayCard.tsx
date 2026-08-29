@@ -247,20 +247,24 @@ const TodayCard = ({ onNavigate }: Props) => {
       {/* 3-Box Overview Grid */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {/* Box 1: Today's Safe Spending Pace */}
-        <div className="flex flex-col justify-between rounded-3xl border bg-card p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col justify-between rounded-3xl border bg-card p-5 shadow-sm sm:p-6 transition-all hover:border-border/80">
           <div>
             <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
-              <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => onNavigate?.("pacer")}
+                className="flex items-center gap-1.5 hover:text-foreground"
+              >
                 <Compass className="size-4 text-primary" />
                 <span className="font-semibold text-foreground">Today&apos;s spending pace</span>
-              </div>
+              </button>
               <span className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                 <CalendarClock className="size-3" />
                 {daysRemainingInclusive}d left
               </span>
             </div>
 
-            <div className="mt-3">
+            <div className="mt-3 cursor-pointer" onClick={() => onNavigate?.("pacer")}>
               <p className="text-xs font-medium text-muted-foreground">
                 {overspent ? "Overspent today by" : "Remaining for today"}
               </p>
@@ -275,7 +279,7 @@ const TodayCard = ({ onNavigate }: Props) => {
             </div>
           </div>
 
-          <div className="mt-4 space-y-1.5">
+          <div className="mt-4 space-y-1.5 cursor-pointer" onClick={() => onNavigate?.("pacer")}>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
                 Spent <strong className="tabular text-foreground">{formatMoney(spentTodayMinor, currency)}</strong> of{" "}
@@ -295,7 +299,13 @@ const TodayCard = ({ onNavigate }: Props) => {
           </div>
 
           <div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
-            <span>Daily discretionary pace</span>
+            <button
+              type="button"
+              onClick={() => onNavigate?.("pacer")}
+              className="hover:text-foreground"
+            >
+              Daily discretionary pace →
+            </button>
             <button
               type="button"
               onClick={() => setEditAllocOpen(true)}
@@ -307,13 +317,17 @@ const TodayCard = ({ onNavigate }: Props) => {
         </div>
 
         {/* Box 2: Accumulated Savings Vault */}
-        <div className="flex flex-col justify-between rounded-3xl border bg-card p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col justify-between rounded-3xl border bg-card p-5 shadow-sm sm:p-6 transition-all hover:border-border/80">
           <div>
             <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
-              <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => onNavigate?.("savings")}
+                className="flex items-center gap-1.5 hover:text-foreground"
+              >
                 <TrendingUp className="size-4 text-emerald-500" />
                 <span className="font-semibold text-foreground">Accumulated savings</span>
-              </div>
+              </button>
               <button
                 type="button"
                 onClick={() => setDepositOpen(true)}
@@ -323,11 +337,10 @@ const TodayCard = ({ onNavigate }: Props) => {
               </button>
             </div>
 
-            <div className="mt-3">
+            <div className="mt-3 cursor-pointer" onClick={() => onNavigate?.("savings")}>
               <p className="text-xs font-medium text-muted-foreground">Total protected savings</p>
               <p
-                onClick={() => setDepositOpen(true)}
-                className="tabular mt-1 cursor-pointer text-3xl font-extrabold tracking-tight text-foreground transition-opacity hover:opacity-80 sm:text-4xl"
+                className="tabular mt-1 text-3xl font-extrabold tracking-tight text-foreground transition-opacity hover:opacity-80 sm:text-4xl"
               >
                 {formatMoney(totalAccumulatedSavings, currency)}
               </p>
@@ -335,7 +348,13 @@ const TodayCard = ({ onNavigate }: Props) => {
           </div>
 
           <div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
-            <span>Off-the-top protected vault</span>
+            <button
+              type="button"
+              onClick={() => onNavigate?.("savings")}
+              className="hover:text-foreground"
+            >
+              Savings vault page →
+            </button>
             <button
               type="button"
               onClick={() => setDepositOpen(true)}
@@ -347,13 +366,17 @@ const TodayCard = ({ onNavigate }: Props) => {
         </div>
 
         {/* Box 3: Wishlist Want Fund */}
-        <div className="flex flex-col justify-between rounded-3xl border bg-card p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col justify-between rounded-3xl border bg-card p-5 shadow-sm sm:p-6 transition-all hover:border-border/80">
           <div>
             <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
-              <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleOpenWishlist}
+                className="flex items-center gap-1.5 hover:text-foreground"
+              >
                 <Gift className="size-4 text-purple-500" />
                 <span className="font-semibold text-foreground">Wishlist fund</span>
-              </div>
+              </button>
               <button
                 type="button"
                 onClick={handleOpenWishlist}
@@ -363,11 +386,10 @@ const TodayCard = ({ onNavigate }: Props) => {
               </button>
             </div>
 
-            <div className="mt-3">
+            <div className="mt-3 cursor-pointer" onClick={handleOpenWishlist}>
               <p className="text-xs font-medium text-muted-foreground">Daily underspend sweeps</p>
               <p
-                onClick={handleOpenWishlist}
-                className="tabular mt-1 cursor-pointer text-3xl font-extrabold tracking-tight text-foreground transition-opacity hover:opacity-80 sm:text-4xl"
+                className="tabular mt-1 text-3xl font-extrabold tracking-tight text-foreground transition-opacity hover:opacity-80 sm:text-4xl"
               >
                 {formatMoney(wantFundMinor, currency)}
               </p>
